@@ -105,8 +105,8 @@ three groups:
   I write these patterns omitting the the reflected spokes (but
   including the middle spoke).  So Crow's foot can be written as 2,0A.
 
-* **Group B**: Patterns with an even number of spokes, where there is
-  no central radial spoke.  A very common example is 3 Cross, which is
+* **Group B**: Patterns with an even number of spokes, without a
+  middle radial spoke.  A very common example is 3 Cross, which is
   simply a 3 offset spoke and a reflected -3 offset spoke, repeated
   around the wheel.
 
