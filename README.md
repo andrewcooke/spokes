@@ -34,6 +34,8 @@ confusing, or replace / conflict with existing usage.
 
 #### Spoke Offsets
 
+We can describe spokes as 
+
 #### Pattern Groups
 
 I describe spoke patterns in three groups:
@@ -60,6 +62,20 @@ Safe, practical spoke designs distribute forces (from tension,
 acceleration, braking and collisions) evenly around the rim.  The
 appropriate choice of pattern for a wheel will depend on many
 different factors and **should be made by an expert wheelbuilder**.
+
+One practical issue I would like to describe in more detail is
+unbalanced rotation.  For example, a radially spoked wheel is "the
+same" as one where all the spokes are offset by one hole - when you
+actually build the wheel with offset spokes and tighten the spokes
+(ignoring problems with spoke length) the spokes would tighten until
+they were radial.
+
+So, to be included in the catalogue, patterns which have spokes offset
+in one direction must also have at least one spoke offset in the
+opposite direction.  This excludes the most obvious problems but still
+allows patterns where rotational forces in the two directions are
+carried by different numbers of spokes (because these patterns are not
+symmetrical they are all group C).
 
 ### Completeness
 
