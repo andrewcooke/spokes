@@ -9,6 +9,7 @@
   * [Pattern Names](#pattern-names)
     * [Spoke Offsets](#spoke-offsets)
     * [Pattern Groups](#pattern-groups)
+    * [Pattern Lengths](#pattern-lengths)
     * [Preferred Names](#preferred-names)
   * [Safety And Practicality](#safety-and-practicality)
   * [Completeness](#completeness)
@@ -41,6 +42,10 @@ We can describe spokes as
 I describe spoke patterns in three groups:
 
 * **Group A**: Patterns where 
+
+#### Pattern Lengths
+
+
 
 #### Preferred Names
 
