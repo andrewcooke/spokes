@@ -9,7 +9,7 @@
   * [Pattern Names](#pattern-names)
     * [Spoke Offsets](#spoke-offsets)
     * [Pattern Groups](#pattern-groups)
-    * [Pattern Lengths](#pattern-lengths)
+    * [Pattern Length](#pattern-length)
     * [Preferred Names](#preferred-names)
   * [Validity](#validity)
   * [Rim Compatability](#rim-compatability)
@@ -20,7 +20,7 @@
 ## Summary
 
 This will be a [complete](#complete) catalogue of all
-[valid](#validity) spoke patterns to [length N](#pattern-lengths).
+[valid](#validity) spoke patterns to [length N](#pattern-length).
 There is no guarantee of [safety or
 practicality](#safety-and-practicality) - in fact, **some patterns are
 unsafe or impractical**.
@@ -75,7 +75,7 @@ in the opposite direction.
 So a traditional 3 Cross pattern has spokes with offset 3 and -3,
 while a radially spoked wheel has spokes of offset 0.
 
-#### Pattern Lengths
+#### Pattern Length
 
 Practical spoke patterns repeat around the wheel, so instead of
 describing the whole wheel we can describe just a single occurence of
