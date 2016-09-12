@@ -34,3 +34,15 @@
 
 
 *~
+*.m4
+*.cache
+compile
+config.*
+configure
+install-sh
+ltmain.sh
+m4
+missing
+*.in
+ar-lib
+depcomp
