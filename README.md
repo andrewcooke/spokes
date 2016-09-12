@@ -55,17 +55,45 @@ the pattern - a single "slice of the pie".
 The number of spokes in the slice is called the *length* of the
 pattern (see [rim compatability](#rim-compatibility)).
 
-Soemtimes I will use the word "pattern" to refer to an entire wheel,
-and sometimes to just the "pie slice".  Hopefully this will be clear
-from the context.
+Soemtimes I use the word "pattern" to refer to an entire wheel, and
+sometimes to just the "pie slice".  Hopefully this will be clear from
+the context.
 
 #### Pattern Groups
 
-I describe spoke patterns in three groups:
+In practice, common spoke patterns are symmetric - the "slice of pie"
+can be divided in two and the spokes on the left are a mirror
+reflection of those on the right.
 
-* **Group A**: Patterns where 
+For example, the Crow's Feet pattern consists of three spokes, with
+offsets 2, 0 and -2.  Spokes with negative offsets are reflections of
+their positive value, so we can describe Crow's Feet as a spoke of
+offset 2 reflected around a radial spoke (of offset 0).
 
-#### Radial Postfix
+Thinking about symmetry in this way lets us divide spoke patterns into
+three groups:
+
+* **Group A**: Patterns like Crow's foot, where there is a radial
+  spoke (offset 0) in the centre of the pattern.
+
+  I write these patterns omitting the the reflected spokes (but
+  including the middle spoke).  So Crow's foot can be written as 3,0A.
+
+* **Group B**: Patterns with an even number of spokes, where there is
+  no central radial spoke.  A very common example is 3 Cross, which is
+  simply a 3 offset spoke and a reflected -3 offset spoke, repeated
+  around the wheel.
+
+  I write these patterns omitting the reflected spokes.  So 3 Cross is
+  simply 3B.
+
+* **Group C**: Everything else!  In other words, patterns that are not
+  symmetric as described above (but see [radial
+  padding](#radial-padding) below.
+
+  I write these patterns out completely.  For example TODO.
+
+#### Radial Padding
 
 
 #### Preferred Names
@@ -80,7 +108,7 @@ To avoid duplication I use the following rules:
 
 * Except for the 0A radial pattern, omit leading and trailing radial
   (0 offset) spokes for groups A and B (these can be described using
-  the [postfix](#radial-postfix).
+  [radial padding](#radial-padding).
 
 * Always start with a positive offset (any pattern can be "reversed"
   by changing the sign of all offsets - this is equivalent to lcaing
