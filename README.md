@@ -1,8 +1,8 @@
 
 # A Catalogue Of Spoke Patterns
 
-This will be a [complete](#complete) catalogue of all
-[valid](#validity) spoke patterns to [length](#pattern-length) 6 with
+This will be a [complete](#complete) catalogue of [valid](#validity)
+spoke patterns to [length](#pattern-length) 6 with
 [offsets](#spoke-offsets) of 3 or less.  There is no guarantee of
 [safety or practicality](#safety-and-practicality) - in fact, **some
 patterns are unsafe or impractical**.
