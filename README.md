@@ -46,9 +46,10 @@ I describe spoke patterns in three groups:
 
 Many patterns can have more than one name.  For example, you could
 describe a traditional 3 Cross pattern as "3A", "3B0", "3,-3C" or even
-"3,-3,3,-3C" etc.  To avoid duplication I always prefer A over B, and
-B over C.  This means that there are no "B0" patterns (since those are
-all "A").
+"3,-3,3,-3C" etc.  To avoid duplication I always favour the
+description that has the least number of offsets listed, with A
+preferred over B.  This means that there are no "B0" patterns (since
+those are all "A").
 
 Similarly, lists of spoke offsets should be rotated so that small (but
 non-negative) values occur first (more exactly, a lexical sorting
