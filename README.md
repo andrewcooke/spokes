@@ -78,13 +78,13 @@ while a radially spoked wheel has spokes of offset 0.
 #### Pattern Length
 
 Practical spoke patterns repeat around the wheel, so instead of
-describing the whole wheel we can describe just a single occurence of
+describing the whole wheel we can describe just a single occurrence of
 the pattern - a single "slice of the pie".
 
 The number of spokes in the slice is called the *length* of the
 pattern (see [rim compatability](#rim-compatibility)).
 
-Soemtimes I use the word "pattern" to refer to an entire wheel, and
+Sometimes I use the word "pattern" to refer to an entire wheel, and
 sometimes to just the "pie slice".  Hopefully this will be clear from
 the context.
 
@@ -153,7 +153,7 @@ To avoid duplication I use the following rules:
   [radial padding](#radial-padding).
 
 * Always start with a positive offset (any pattern can be "reversed"
-  by changing the sign of all offsets - this is equivalent to lcaing
+  by changing the sign of all offsets - this is equivalent to lacing
   the pattern anti-clockwise instead of clockwise).
 
 * The above may still not exclude all duplications.  So I also check
@@ -188,7 +188,7 @@ multiple<sup>[2](#footnote-2)</sup> of 2N spoke holes, providing the
 crosses are possible without spokes overlapping heads.  So a pattern
 of length 3 (like Crow's Foot) can be used with 36 hole rims, and a
 pattern of length 2 (like 3 Cross) can be used with pretty much any
-rim as long as the hub can accomodate the spoke angles.
+rim as long as the hub can accommodate the spoke angles.
 
 The illustrations typically show 32 hole rims, unless that is
 incompatible with a particular pattern.
@@ -202,7 +202,7 @@ or practical the design may be**.
 Safe, practical spoke designs distribute forces (from tension,
 acceleration, braking and collisions) evenly around the rim.  The
 appropriate choice of pattern for a wheel will depend on many
-different factors and **should be made by an expert wheelbuilder**.
+different factors and **should be made by an expert wheel-builder**.
 
 ### Completeness
 
