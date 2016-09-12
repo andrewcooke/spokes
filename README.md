@@ -178,7 +178,7 @@ generating the catalogue I discard:
   at least one spoke offset in the opposite direction.  This excludes
   the most obvious problems but still allows patterns where rotational
   forces in the two directions are carried by different numbers of
-  spokes (because these patterns are not symmetrical they are all
+  spokes (because these patterns are not symmetric they are all
   group C).
 
 ### Rim Compatability
