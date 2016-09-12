@@ -46,13 +46,13 @@ detail, but all you really need to know is:
 
 So 2,0A1 consists of
 
-* an offset 2 spoke,
+* an offset 2 spoke (the "2"),
 
-* a radial spoke,
+* a radial spoke (the "0"),
 
-* an offset -2 spoke (the first spoke, reflected),
+* an offset -2 spoke (the first spoke, reflected, because of "A"),
 
-* another radial spoke,
+* a single "extra" radial spoke (the trailing "1"),
 
 and so is better known as the Adapated Crow's Foot.
 
