@@ -102,21 +102,21 @@ offset 2 reflected around a radial spoke (of offset 0).
 Thinking about symmetry in this way lets us divide spoke patterns into
 three groups:
 
-* **Group A**: Patterns like Crow's foot, where there is a radial
-  spoke (offset 0) in the middle.
+* **A**: Patterns like Crow's foot, where there is a radial spoke
+  (offset 0) in the middle.
 
   I write these patterns omitting the the reflected spokes (but
   including the middle spoke).  So Crow's foot can be written as 2,0A.
 
-* **Group B**: Patterns with an even number of spokes, without a
-  middle radial spoke.  A very common example is 3 Cross, which is
-  simply a 3 offset spoke and a reflected -3 offset spoke, repeated
-  around the wheel.
+* **B**: Patterns with an even number of spokes, without a middle
+  radial spoke.  A very common example is 3 Cross, which is simply a 3
+  offset spoke and a reflected -3 offset spoke, repeated around the
+  wheel.
 
   I write these patterns omitting the reflected spokes.  So 3 Cross is
   simply 3B.
 
-* **Group C**: Everything else.  In other words, patterns that are not
+* **C**: Everything else.  In other words, patterns that are not
   symmetric as described above (but see [radial
   padding](#radial-padding) below).
 
