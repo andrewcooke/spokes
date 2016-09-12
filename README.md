@@ -50,7 +50,7 @@ describe a traditional 3 Cross pattern as "3A", "3B0", "3,-3C" or even
 B over C.  This means that there are no "B0" patterns (since those are
 all "A").
 
-Similarly, lists of spoke offsets should be ordered so that small (but
+Similarly, lists of spoke offsets should be rotated so that small (but
 non-negative) values occur first (more exactly, a lexical sorting
 based on numerical values, but where negative values come later; more
 exactly still, please see the code).
