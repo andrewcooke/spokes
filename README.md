@@ -160,12 +160,12 @@ To avoid duplication I use the following rules:
 
 ### Rim Compatability
 
-A pattern of length N can be used in any wheel with a multiple of 2N
-spoke holes, providing the crosses are
-possible<sup>[2](#footnote-2)</sup>.  So a pattern of length 3 (like
-Crow's Foot) can be used with 36 hole rims, and a pattern of length 2
-(like 3 Cross) can be used with pretty much any rim as long as the hub
-can accomodate the spoke angles.
+A pattern of length N can be used in any wheel with a
+multiple<sup>[2](#footnote-2)</sup> of 2N spoke holes, providing the
+crosses are possible without spokes overlapping heads.  So a pattern
+of length 3 (like Crow's Foot) can be used with 36 hole rims, and a
+pattern of length 2 (like 3 Cross) can be used with pretty much any
+rim as long as the hub can accomodate the spoke angles.
 
 The illustrations typically show 32 hole rims, unless that is
 incompatible with a particular pattern.
