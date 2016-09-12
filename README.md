@@ -225,8 +225,7 @@ me as it may mean I have a bug in my program!
 
 **<a name="footnote-1">1</a>** - More exactly, I check against a
 lexical sorting based on numerical values, but where negative values
-come later, and zero last of all.  More exactly still, please see the
-code.
+come later.  More exactly still, please see the code.
 
 **<a name="footnote-2">2</a>** - I think this can be shown using
 [modular
