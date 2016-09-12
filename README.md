@@ -9,7 +9,7 @@
   * [Pattern Names](#pattern-names)
     * [Spoke Offsets](#spoke-offsets)
     * [Pattern Groups](#pattern-groups)
-    * [Canonical Names](#canonical-names)
+    * [Prefered Names](#prefered-names)
   * [Safety And Practicality](#safety-and-practicality)
   * [Completeness](#completeness)
 
@@ -42,7 +42,7 @@ I describe spoke patterns in three groups:
 
 * **Group A**: Patterns where 
 
-#### Canonical Names
+#### Prefered Names
 
 Many patterns can have more than one name.  For example, you could
 describe a traditional 3 Cross pattern as "3A", "3B0", "3,-3C" or even
