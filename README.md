@@ -102,6 +102,8 @@ This catalogue is restricted to:
 * Completely spoked wheels.  I have not considered gaps / missing
   spokes.
 
+* Spoke offsets of 4 (or less).
+
 * Patterns of length N (or less).
 
 Apart from these limitations, the catalogue should be complete as it
