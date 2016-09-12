@@ -150,7 +150,7 @@ To avoid duplication I use the following rules:
 
 * Except for the 0A Radial pattern, omit leading and trailing radial
   (0 offset) spokes for groups A and B (except those added with
-  [radial padding](#radial-padding).
+  [radial padding](#radial-padding)).
 
 * Always start with a positive offset (any pattern can be "reversed"
   by changing the sign of all offsets - this is equivalent to lacing
