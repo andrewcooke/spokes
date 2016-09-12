@@ -136,15 +136,17 @@ is written as 2,0A1 (ordinary Crow's Foot is 2,0A).
 #### Preferred Names
 
 Many patterns can have more than one name.  For example, you could
-describe a traditional 3 Cross pattern as "3B", "3,-3C" or even
+describe a traditional 3 Cross pattern as "3B", "3B0", "3,-3C" or even
 "3,-3,3,-3C" etc.
 
 To avoid duplication I use the following rules:
 
 * Always prefer group A over B, and B over C.
 
+* Omit [radial padding](#radial-padding) of zero.
+
 * Except for the 0A radial pattern, omit leading and trailing radial
-  (0 offset) spokes for groups A and B (these can be described using
+  (0 offset) spokes for groups A and B (except those added with
   [radial padding](#radial-padding).
 
 * Always start with a positive offset (any pattern can be "reversed"
