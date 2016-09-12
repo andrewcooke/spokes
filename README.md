@@ -36,7 +36,24 @@ confusing, or replace / conflict with existing usage.
 
 #### Spoke Offsets
 
-We can describe spokes as 
+We can describe spokes as being offset by some number of holes
+relative to where a radial spoke would connect.  A spoke of "offset 1"
+is shifted one place to the left (in practice, that is two rim holes,
+because the intermediate hole is used to connected to the other side
+of the hub).  A negative offset is the same number of holes in the
+opposite direction.
+
+So a traditional 3 Cross pattern has spokes with offset 3 and -3,
+while a radially spoked wheel has spokes of offset 0.
+
+#### Pattern Lengths
+
+Practical spoke patterns repeat around the wheel, so instead of
+describing the whole wheel we can describe just a single occurenve of
+the pattern - a single "slice of the pie".
+
+The number of spokes in the slice is called the *length* of the
+pattern (see [rim compatability](#rim-compatibility)).
 
 #### Pattern Groups
 
@@ -44,21 +61,26 @@ I describe spoke patterns in three groups:
 
 * **Group A**: Patterns where 
 
-#### Pattern Lengths
-
+#### Radial Postfix
 
 
 #### Preferred Names
 
 Many patterns can have more than one name.  For example, you could
 describe a traditional 3 Cross pattern as "3A", "3B0", "3,-3C" or even
-"3,-3,3,-3C" etc.  To avoid duplication I always favour the
-description that has the least number of offsets listed, with A
-preferred over B.  This means that there are no "B0" patterns (since
-those are all "A").
+"3,-3,3,-3C" etc.
 
-Similarly, lists of spoke offsets should be rotated so that small (but
-non-negative) values occur first<sup>[1](#footnote-1)</sup>.
+To avoid duplication I use the following rules:
+
+* Always prefer group A over B, and B over C.
+
+* Except for the 0A radial pattern, omit leading and trailing radial
+  (0 offset) spokes for groups A and B (these can be described using
+  the [postfix](#radial-postfix).
+
+* Always start with a positive offset (any pattern can be "reversed"
+  by changing the sign of all offsets - this is equivalent to lcaing
+  the pattern anti-clockwise instead of clockwise).
 
 ### Rim Compatability
 
@@ -109,6 +131,10 @@ This catalogue is restricted to:
 
 * Completely spoked wheels.  I have not considered gaps / missing
   spokes.
+
+* Patterns where, going round the rim, spokes alternate from one side
+  of the hub to the other (many rims are drilled to reflect this
+  practice).  See [spoke offsets](#spoke-offsets).
 
 * Spoke offsets of 4 (or less).
 
