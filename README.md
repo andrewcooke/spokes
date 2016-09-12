@@ -100,7 +100,7 @@ Thinking about symmetry in this way lets us divide spoke patterns into
 three groups:
 
 * **Group A**: Patterns like Crow's foot, where there is a radial
-  spoke (offset 0) in the centre of the pattern.
+  spoke (offset 0) in the middle.
 
   I write these patterns omitting the the reflected spokes (but
   including the middle spoke).  So Crow's foot can be written as 2,0A.
