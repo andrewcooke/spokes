@@ -155,8 +155,7 @@ To avoid duplication I use the following rules:
 
 * The above may still not exclude all duplications.  So I also check
   for rotations of C patterns and discard anything that can be
-  expressed as an A or B pattern, or an "earlier" C
-  pattern<sup>[1](#footnote-1)</sup>.
+  expressed as an "earlier" name<sup>[1](#footnote-1)</sup>.
 
 ### Rim Compatability
 
