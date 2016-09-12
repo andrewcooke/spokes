@@ -58,15 +58,13 @@ preferred over B.  This means that there are no "B0" patterns (since
 those are all "A").
 
 Similarly, lists of spoke offsets should be rotated so that small (but
-non-negative) values occur first (more exactly, a lexical sorting
-based on numerical values, but where negative values come later; more
-exactly still, please see the code).
+non-negative) values occur first<sup>[1](#footnote-1)</sup>.
 
 ### Rim Compatability
 
 A pattern of length N can be used in any wheel with a multiple of 2N
 spoke holes, providing the crosses are
-possible<sup>[1](#footnote-1)</sup>.  So a pattern of length 3 (like
+possible<sup>[2](#footnote-2)</sup>.  So a pattern of length 3 (like
 Crow's Foot) can be used with 36 hole rims, and a pattern of length 2
 (like 3 Cross) can be used with pretty much any rim as long as the hub
 can accomodate the spoke angles.
@@ -123,6 +121,10 @@ me as it may mean I have a bug in my program!
 
 ### Footnotes
 
-**<a name="footnote-1">1</a>** - I think this can be shown using
-  [modular
-  arithmetic](https://en.wikipedia.org/wiki/Modular_arithmetic).
+**<a name="footnote-1">1</a>** - More exactly, a lexical sorting based
+on numerical values, but where negative values come later.  More
+exactly still, please see the code.
+
+**<a name="footnote-2">2</a>** - I think this can be shown using
+[modular
+arithmetic](https://en.wikipedia.org/wiki/Modular_arithmetic).
