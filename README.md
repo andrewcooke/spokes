@@ -66,9 +66,8 @@ different factors and **should be made by an expert wheelbuilder**.
 One practical issue I would like to describe in more detail is
 unbalanced rotation.  For example, a radially spoked wheel is "the
 same" as one where all the spokes are offset by one hole - when you
-actually build the wheel with offset spokes and tighten the spokes
-(ignoring problems with spoke length) the spokes would tighten until
-they were radial.
+actually build the wheel with offset spokes (ignoring problems with
+spoke length) the spokes would tighten until they were radial.
 
 So, to be included in the catalogue, patterns which have spokes offset
 in one direction must also have at least one spoke offset in the
