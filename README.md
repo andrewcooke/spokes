@@ -18,7 +18,7 @@
 This will be a [complete](#complete) catalogue of all spoke patterns
 to [length N](#pattern-names).  There is no guarantee of [safety or
 practicality](#safety-and-practicality) - in fact, **some patterns are
-unsafe and impractical**.
+unsafe or impractical**.
 
 ## Catalogue
 
