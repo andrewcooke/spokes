@@ -46,3 +46,7 @@ missing
 *.in
 ar-lib
 depcomp
+Makefile
+stamp-h1
+libtool
+.deps
