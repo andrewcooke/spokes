@@ -126,7 +126,7 @@ make a new pattern by adding another radial spoke to one side.
 
 These patterns aren't very interesting, but can sometimes be useful.
 For example, the Adapted Crow's Foot pattern has an extra radial
-spoke, making it's length 4 (ordinary Crow's Foot has 3 spokes in a
+spoke, making its length 4 (ordinary Crow's Foot has 3 spokes in a
 "slice of pie").
 
 Instead of writing these patterns out as type C, I add the number of
