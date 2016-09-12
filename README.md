@@ -52,7 +52,7 @@ all "A").
 
 Similarly, lists of spoke offsets should be ordered so that small (but
 non-negative) values occur first (more exactly, a lexical sorting
-based on numeri values, but where negative values come later; more
+based on numerical values, but where negative values come later; more
 exactly still, please see the code).
 
 ### Rim Compatability
