@@ -30,6 +30,32 @@ Catalogue will go here
 
 ### Pattern Names
 
+The patterns above have names like 2,0A1.  Below I describe these in
+detail, but all you really need to know is:
+
+* The numbers are spoke offsets.
+
+* For A patterns, reflect the spokes described by the offsets around
+  trailing 0 offset (radial) spoke.
+
+* For B patterns, reflect all the spokes.
+
+* C patterns are written out completely.
+
+* Any trailing digit gives the number of additional radial spokes.
+
+So 2,0A1 consists of
+
+* an offset 2 spoke,
+
+* a radial spoke,
+
+* an offset -2 spoke (the first spoke, reflected),
+
+* another radial spoke,
+
+and so is better known as the Adapated Crow's Foot.
+
 To write this software and organise the results into the catalogue
 above I have had to invent some terms.  My apologies if these are
 confusing, or replace / conflict with existing usage.
