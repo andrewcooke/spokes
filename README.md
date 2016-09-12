@@ -136,7 +136,7 @@ is written as 2,0A1 (ordinary Crow's Foot is 2,0A).
 #### Preferred Names
 
 Many patterns can have more than one name.  For example, you could
-describe a traditional 3 Cross pattern as "3A", "3B0", "3,-3C" or even
+describe a traditional 3 Cross pattern as "3B", "3,-3C" or even
 "3,-3,3,-3C" etc.
 
 To avoid duplication I use the following rules:
