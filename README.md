@@ -123,6 +123,6 @@ me as it may mean I have a bug in my program!
 
 ### Footnotes
 
-**<a name="myfootnote1">1</a>** - I think this can be shown using
+**<a name="footnote-1">1</a>** - I think this can be shown using
   [modular
   arithmetic](https://en.wikipedia.org/wiki/Modular_arithmetic).
