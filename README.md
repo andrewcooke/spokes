@@ -3,7 +3,7 @@
 
 ## Contents
 
-* [Summary]
+* [Summary](#summary)
 * [Catalogue](#catalogue)
 * [Notes](#notes)
   * [Pattern Names](#pattern-names)
