@@ -37,11 +37,11 @@ confusing, or replace / conflict with existing usage.
 #### Spoke Offsets
 
 We can describe spokes as being offset by some number of holes
-relative to where a radial spoke would connect.  A spoke of "offset 1"
-is shifted one place to the left (in practice, that is two rim holes,
-because the intermediate hole is used to connected to the other side
-of the hub).  A negative offset is the same number of holes in the
-opposite direction.
+relative to where a radial spoke would connect to the rim.  A spoke of
+"offset 1" is shifted one place to the right (in practice, that is two
+rim holes, because the intermediate hole is used to connected to the
+other side of the hub).  A negative offset is the same number of holes
+in the opposite direction.
 
 So a traditional 3 Cross pattern has spokes with offset 3 and -3,
 while a radially spoked wheel has spokes of offset 0.
@@ -49,7 +49,7 @@ while a radially spoked wheel has spokes of offset 0.
 #### Pattern Lengths
 
 Practical spoke patterns repeat around the wheel, so instead of
-describing the whole wheel we can describe just a single occurenve of
+describing the whole wheel we can describe just a single occurence of
 the pattern - a single "slice of the pie".
 
 The number of spokes in the slice is called the *length* of the
