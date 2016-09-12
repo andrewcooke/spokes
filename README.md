@@ -113,7 +113,7 @@ three groups:
   I write these patterns omitting the reflected spokes.  So 3 Cross is
   simply 3B.
 
-* **Group C**: Everything else!  In other words, patterns that are not
+* **Group C**: Everything else.  In other words, patterns that are not
   symmetric as described above (but see [radial
   padding](#radial-padding) below).
 
