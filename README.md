@@ -20,7 +20,7 @@
 ## Summary
 
 This will be a [complete](#complete) catalogue of all
-[valid](#validity) spoke patterns to [length N](#pattern-length).
+[valid](#validity) spoke patterns to [length](#pattern-length) N TODO.
 There is no guarantee of [safety or
 practicality](#safety-and-practicality) - in fact, **some patterns are
 unsafe or impractical**.
