@@ -11,6 +11,7 @@
     * [Pattern Groups](#pattern-groups)
     * [Pattern Lengths](#pattern-lengths)
     * [Preferred Names](#preferred-names)
+  * [Validity](#validity)
   * [Rim Compatability](#rim-compatability)
   * [Safety And Practicality](#safety-and-practicality)
   * [Completeness](#completeness)
@@ -159,7 +160,7 @@ To avoid duplication I use the following rules:
   for rotations of C patterns and discard anything that can be
   expressed as an "earlier" name<sup>[1](#footnote-1)</sup>.
 
-#### Validity
+### Validity
 
 Not every pattern described by a name can be built in practice.  When
 generating the catalogue I discard:
