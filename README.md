@@ -121,7 +121,7 @@ three groups:
 
 #### Radial Padding
 
-When you have a patern that defines a "slice of pie" you can usually
+When you have a pattern that defines a "slice of pie" you can usually
 make a new pattern by adding another radial spoke to one side.
 
 These patterns aren't very interesting, but can sometimes be useful.
@@ -131,7 +131,7 @@ spoke, making it's length 4 (ordinary Crow's Foot has 3 spokes in a
 
 Instead of writing these patterns out as type C, I add the number of
 extra radial spokes after the pattern letter.  So Adapted Crow's Foot
-is written as 2,0A1.
+is written as 2,0A1 (ordinary Crow's Foot is 2,0A).
 
 #### Preferred Names
 
