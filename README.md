@@ -145,7 +145,7 @@ To avoid duplication I use the following rules:
 
 * Omit [radial padding](#radial-padding) of zero.
 
-* Except for the 0A radial pattern, omit leading and trailing radial
+* Except for the 0A Radial pattern, omit leading and trailing radial
   (0 offset) spokes for groups A and B (except those added with
   [radial padding](#radial-padding).
 
