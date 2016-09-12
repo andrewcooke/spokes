@@ -77,7 +77,7 @@ three groups:
   spoke (offset 0) in the centre of the pattern.
 
   I write these patterns omitting the the reflected spokes (but
-  including the middle spoke).  So Crow's foot can be written as 3,0A.
+  including the middle spoke).  So Crow's foot can be written as 2,0A.
 
 * **Group B**: Patterns with an even number of spokes, where there is
   no central radial spoke.  A very common example is 3 Cross, which is
@@ -89,12 +89,23 @@ three groups:
 
 * **Group C**: Everything else!  In other words, patterns that are not
   symmetric as described above (but see [radial
-  padding](#radial-padding) below.
+  padding](#radial-padding) below).
 
   I write these patterns out completely.  For example TODO.
 
 #### Radial Padding
 
+When you have a patern that defines a "slice of pie" you can usually
+make a new pattern by adding another radial spoke to one side.
+
+These patterns aren't very interesting, but can sometimes be useful.
+For example, the Adapted Crow's Foot pattern has an extra radial
+spoke, making it's length 4 (ordinary Crow's Foot has 3 spokes in a
+"slice of pie").
+
+Instead of writing these patterns out as type C, I add the number of
+extra radial spokes after the pattern letter.  So Adapted Crow's Foot
+is written as 2,0A1.
 
 #### Preferred Names
 
@@ -113,6 +124,11 @@ To avoid duplication I use the following rules:
 * Always start with a positive offset (any pattern can be "reversed"
   by changing the sign of all offsets - this is equivalent to lcaing
   the pattern anti-clockwise instead of clockwise).
+
+* The above may still not exclude all duplications.  So I also check
+  for rotations of C patterns and discard anything that can be
+  expressed as an A or B pattern, or an "earlier" C
+  pattern<sup>[1](#footnote-1)</sup>.
 
 ### Rim Compatability
 
@@ -180,8 +196,8 @@ me as it may mean I have a bug in my program!
 ### Footnotes
 
 **<a name="footnote-1">1</a>** - More exactly, a lexical sorting based
-on numerical values, but where negative values come later.  More
-exactly still, please see the code.
+on numerical values, but where negative values come later, and zero
+last of all.  More exactly still, please see the code.
 
 **<a name="footnote-2">2</a>** - I think this can be shown using
 [modular
