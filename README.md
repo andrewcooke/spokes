@@ -133,6 +133,9 @@ Instead of writing these patterns out as type C, I add the number of
 extra radial spokes after the pattern letter.  So Adapted Crow's Foot
 is written as 2,0A1 (ordinary Crow's Foot is 2,0A).
 
+For consistency, C patterns (if any) with trailing zeroes are also
+written in this way.
+
 #### Preferred Names
 
 Many patterns can have more than one name.  For example, you could
@@ -146,8 +149,8 @@ To avoid duplication I use the following rules:
 * Omit [radial padding](#radial-padding) of zero.
 
 * Except for the 0A Radial pattern, omit leading and trailing radial
-  (0 offset) spokes for groups A and B (except those added with
-  [radial padding](#radial-padding)).
+  (0 offset) spokes (except those added with [radial
+  padding](#radial-padding)).
 
 * Always start with a positive offset (any pattern can be "reversed"
   by changing the sign of all offsets - this is equivalent to lacing
