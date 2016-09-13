@@ -8,12 +8,16 @@
 #include "lu/dynamic_memory.h"
 
 #define OFFSET_BITS 3
-#define MAX_DEPTH 6
+#define MAX_LENGTH 6
+
+#define LENGTH_A ((MAX_LENGTH - 1) / 2)
+#define LENGTH_B (MAX_LENGTH / 2)
+#define LENGTH_C MAX_LENGTH
 
 #define UNUSED_OFFSET (1 << (OFFSET_BITS - 1))
 #define MAX_OFFSET (UNUSED_OFFSET - 1)
 #define OFFSET_LIMIT (1 << OFFSET_BITS)
-#define PATTERN_BITS (OFFSET_BITS * MAX_DEPTH)
+#define PATTERN_BITS (OFFSET_BITS * MAX_LENGTH)
 
 // if you change this, also change 63, 64 below
 #define SIEVE uint64_t
@@ -27,20 +31,18 @@
 #define SIEVE_MASK(pattern) (1 << (pattern - SIEVE_INDEX(pattern) * SIEVE_BITS))
 
 #define SIEVE_RIGHT_MASK (OFFSET_LIMIT - 1)
-#define SIEVE_LEFT_MASK (((1 << PATTERN_BITS) - 1) ^ SIEVE_RIGHT_MASK)
-#define SIEVE_RIGHT_ROTN (PATTERN_BITS - OFFSET_BITS)
-#define SIEVE_LEFT_ROTN OFFSET_BITS
 
 // this must contain at least OFFSET_BITS bits (unsigned)
-#define SPOKE uint64_t
+#define OFFSET uint64_t
+#define OFFSET_MASK ((1 << OFFSET_BITS) - 1)
+#define OFFSET_SIGN UNUSED_OFFSET
+#define OFFSET_VALUE (OFFSET_MASK ^ OFFSET_SIGN)
+#define GET_OFFSET(pattern, index) ((pattern >> (index * OFFSET_BITS)) & OFFSET_MASK)
 
-// this must contain at least OFFSET_BITS * MAX_DEPTH bits (unsigned)
+// this must contain at least PATTERN_BITS bits (unsigned)
 #define PATTERN uint64_t
 
 #define PATTERN_FILE "patterns.txt"
-
-#define K 1024
-#define M (K * K)
 
 
 int check_sieve(SIEVE *sieve, PATTERN pattern) {
@@ -49,32 +51,63 @@ int check_sieve(SIEVE *sieve, PATTERN pattern) {
     return sieve[index] & mask;
 }
 
-void update_sieve(SIEVE *sieve, PATTERN pattern) {
-    for (int i = 0; i < MAX_OFFSET; ++i) {
+// we update the sieve for all possible rotations.  this implies that we
+// must generate the "least padded" pattern first and then write all
+// related paddings.
+void update_sieve(SIEVE *sieve, PATTERN pattern, int length) {
+    int right_rotn = OFFSET_BITS * (length - 1);
+    PATTERN left_mask = ((1 << length) - 1) ^ SIEVE_RIGHT_MASK;
+    for (int i = 0; i < length; ++i) {
         int index = SIEVE_INDEX(pattern);
         SIEVE mask = SIEVE_MASK(pattern);
         sieve[index] |= mask;
-        pattern = ((pattern & SIEVE_LEFT_MASK) >> SIEVE_LEFT_ROTN) | ((pattern & SIEVE_RIGHT_MASK) << SIEVE_RIGHT_ROTN);
+        pattern = ((pattern & left_mask) >> OFFSET_BITS) | ((pattern & SIEVE_RIGHT_MASK) << right_rotn);
     }
 }
 
-void print_result(FILE *out, PATTERN pattern, const char *name) {
-    fprintf(out, "%08x %s\n", pattern, name);
+void print_result(lulog *log, FILE *out, PATTERN pattern, const char *name) {
+    ludebug(log, "%08x %s", pattern, name);
+    fprintf(out, "%s\n", name);
 }
 
-int radial(lulog *log, SIEVE *sieve, FILE *out) {
-    update_sieve(sieve, 0);
-    print_result(out, 0, "0A");
-    return LU_OK;
+char *sprint_offset(char *p, OFFSET offset) {
+    if (offset & OFFSET_SIGN) sprintf(p++, "-");
+    sprintf(p++, "%d", offset & OFFSET_VALUE);
+    return p;
 }
 
-int search_a(lulog *log, SIEVE *sieve) {
-    for (SPOKE i = 0; i < OFFSET_LIMIT; ++i) {
-        if (i != UNUSED_OFFSET) {
-            ludebug(log, "%d", i);
+void print_result_a(lulog *log, FILE *out, PATTERN pattern, int padding) {
+    char name[2*MAX_LENGTH+3] = {0};
+    char *p = name;
+    PATTERN mask = OFFSET_MASK << OFFSET_BITS;
+    int half = 1;
+    while (pattern & mask) {half++; mask <<= OFFSET_BITS;}
+    for (int i = half; i > 0; --i) {
+        p = sprint_offset(p, GET_OFFSET(pattern, i-1));
+    }
+    sprintf(p++, "A");
+    if (padding) sprintf(p, "%d", padding);
+    print_result(log, out, pattern, name);
+}
+
+void radial(lulog *log, SIEVE *sieve, FILE *out) {
+    update_sieve(sieve, 0, 1);
+    print_result_a(log, out, 0, 0);
+}
+
+void search_a(lulog *log, SIEVE *sieve) {
+    PATTERN pattern = 0;
+    while (1) {
+        int index = 0;
+        do {
+            OFFSET offset = GET_OFFSET(pattern, index) + 1;
+            if (offset == UNUSED_OFFSET) offset++;
+
+        } while (1);
+        if (!check_sieve(sieve, pattern)) {
+
         }
     }
-    return LU_OK;
 }
 
 int search_b(lulog *log, SIEVE *sieve) {
@@ -93,14 +126,14 @@ int main(int argc, char** argv) {
     SIEVE *sieve = NULL;
 
     lulog_mkstderr(&log, lulog_level_debug);
-    luinfo(log, "Maximum offset %d.  Maximum depth %d", MAX_OFFSET, MAX_DEPTH);
-    ludebug(log, "Sieve %dB (%dkB, %dMB)", SIEVE_LEN_BYTES, SIEVE_LEN_BYTES / K, SIEVE_LEN_BYTES / M);
+    luinfo(log, "Maximum spoke offset %d; Maximum pattern length %d", MAX_OFFSET, MAX_LENGTH);
+    luinfo(log, "Sieve size %dkB", SIEVE_LEN_BYTES / 1024);
     LU_ALLOC(log, sieve, SIEVE_LEN)
     LU_ASSERT(!lufle_exists(log, PATTERN_FILE), LU_ERR_IO, log, "Output file %s already exists", PATTERN_FILE)
     lufle_open(log, PATTERN_FILE, "w", &out);
 
-    LU_CHECK(radial(log, sieve, out))
-    LU_CHECK(search_a(log, sieve))
+    radial(log, sieve, out);
+    search_a(log, sieve);
     LU_CHECK(search_b(log, sieve))
     LU_CHECK(search_c(log, sieve))
 
