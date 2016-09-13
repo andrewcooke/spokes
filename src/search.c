@@ -53,7 +53,7 @@ void update_sieve(SIEVE *sieve, PATTERN pattern) {
     for (int i = 0; i < MAX_OFFSET; ++i) {
         int index = SIEVE_INDEX(pattern);
         SIEVE mask = SIEVE_MASK(pattern);
-        sieve[index] |= pattern;
+        sieve[index] |= mask;
         pattern = ((pattern & SIEVE_LEFT_MASK) >> SIEVE_LEFT_ROTN) | ((pattern & SIEVE_RIGHT_MASK) << SIEVE_RIGHT_ROTN);
     }
 }
@@ -64,7 +64,7 @@ void print_result(FILE *out, PATTERN pattern, const char *name) {
 
 int radial(lulog *log, SIEVE *sieve, FILE *out) {
     update_sieve(sieve, 0);
-    print_result(out, 0, "A0");
+    print_result(out, 0, "0A");
     return LU_OK;
 }
 
