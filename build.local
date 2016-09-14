@@ -1,6 +1,7 @@
 #!/bin/bash
 
 autoreconf -fi
-./configure CFLAGS='-I/home/andrew/project/liblu/install/include' LDFLAGS='-L/home/andrew/project/liblu/install/lib64'
+#./configure CFLAGS='-I/home/andrew/project/liblu/install/include' LDFLAGS='-L/home/andrew/project/liblu/install/lib64'
+./configure CFLAGS='-g -O0 -I/home/andrew/project/liblu/install/include' LDFLAGS='-L/home/andrew/project/liblu/install/lib64'
 make
 make check
