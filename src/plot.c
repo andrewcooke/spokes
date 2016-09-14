@@ -19,7 +19,36 @@ int unpack_c(const char *pattern, int **offsets, int *length) {
 }
 
 int unpack_b(const char *pattern, int **offsets, int *length) {
-    return LU_OK;
+
+    LU_STATUS
+
+    const char *p = pattern;
+    int sign = 1;
+
+    while (*p != 'B') {
+        if (*p == ',') sign = 1;
+        else if (*p == '-') sign = -sign;
+        else {
+            int offset = *p - '0';
+            if (!(*offsets = realloc(*offsets, (1 + *length) * sizeof(**offsets)))) return LU_ERR_MEM;
+            (*offsets)[*length] = sign * offset;
+            (*length)++;
+            sign = 1;
+        }
+        p++;
+    }
+    p++;   // drop B
+    if (!(*offsets = realloc(*offsets, (2 * *length) * sizeof(**offsets)))) return LU_ERR_MEM;
+    for (int i = 0; i < *length; ++i) (*offsets)[*length + i] = -(*offsets)[*length - i - 1];
+    *length = 2 * *length;
+    if (*p) {
+        int padding = *p - '0';
+        if (!(*offsets = realloc(*offsets, (padding + *length) * sizeof(**offsets)))) return LU_ERR_MEM;
+        for (int i = 0; i < padding; ++i) (*offsets)[*length + i] = 0;
+        *length = padding + *length;
+    }
+
+    LU_NO_CLEANUP
 }
 
 int unpack_a(const char *pattern, int **offsets, int *length) {

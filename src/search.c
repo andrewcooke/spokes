@@ -32,7 +32,7 @@
 #define MAX_OFFSET (UNUSED_OFFSET - 1)
 #define OFFSET_VALUE MAX_OFFSET
 #define OFFSET_LIMIT (1L << OFFSET_BITS)
-#define NEG(o) (o ^ OFFSET_SIGN)
+#define NEG(o) (o ? (o ^ OFFSET_SIGN) : o)
 #define LENGTH_A ((MAX_LENGTH + 1) / 2)
 #define LENGTH_B (MAX_LENGTH / 2)
 #define LENGTH_C MAX_LENGTH
@@ -85,15 +85,15 @@ FILE *out = NULL;
 //    SET_SIEVE(n);
 //    ludebug(dbg, "Pattern %d -> sieve set at %d/%d", n, index, shift);
 //}
-
-int rim_index(OFFSET_T offset, int index, int length) {
-    int sign = offset & OFFSET_SIGN;
-    int value = offset & OFFSET_VALUE;
-    ludebug(dbg, "Offset %d -> value %d sign %d", offset, value, sign);
-    int rim = 1L << ((index + (sign ? -1 : 1) * value + 2 * length) % length);
-    ludebug(dbg, "Offset %d at index %d -> rim %d", sign ? -value : value, index, rim);
-    return rim;
-}
+//
+//int rim_index(OFFSET_T offset, int index, int length) {
+//    int sign = offset & OFFSET_SIGN;
+//    int value = offset & OFFSET_VALUE;
+//    ludebug(dbg, "Offset %d -> value %d sign %d", offset, value, sign);
+//    int rim = 1L << ((index + (sign ? -1 : 1) * value + 2 * length) % length);
+//    ludebug(dbg, "Offset %d at index %d -> rim %d", sign ? -value : value, index, rim);
+//    return rim;
+//}
 
 // this shouldn't be necessary as all candidates are constructed, but
 // it does allow enumeration of possible values from sieve gaps.
@@ -142,7 +142,7 @@ void set_sieve_all(PATTERN_T pattern) {
     }
 }
 
-void write_pattern_a(OFFSET_T *offsets, int length, int padding) {
+void write_pattern_ab(OFFSET_T *offsets, int length, char group, int padding) {
 
     char buffer[3*MAX_LENGTH+3], *p;
 
@@ -155,7 +155,7 @@ void write_pattern_a(OFFSET_T *offsets, int length, int padding) {
             p += sprintf(p, "%d", offsets[length - i - 1]);
         }
     }
-    *(p++) = 'A';
+    *(p++) = group;
     if (padding) p += sprintf(p, "%d", padding);
     *p = '\0';
 
@@ -169,10 +169,10 @@ int candidate_a(OFFSET_T *offsets, int length) {
     int half = (length + 1) / 2;
     PATTERN_T pattern = 0;
 
-    ludebug(dbg, "Candidate length %d offsets %d %d %d", length, offsets[0], offsets[1], offsets[2]);
-
     for (int i = 0; i < half; ++i) {pattern <<= OFFSET_BITS; pattern |= offsets[half - i - 1];}
-    for (int i = 1; i < half; ++i) {pattern <<= OFFSET_BITS; pattern |= (offsets[i] | OFFSET_SIGN);}
+    for (int i = 1; i < half; ++i) {pattern <<= OFFSET_BITS; pattern |= NEG(offsets[i]);}
+
+    ludebug(dbg, "Candidate A length %d offsets %d %d %d -> %x", length, offsets[0], offsets[1], offsets[2], pattern);
 
     if (GET_SIEVE(pattern)) {
         ludebug(dbg, "Pattern %x already exists", pattern);
@@ -188,7 +188,7 @@ int candidate_a(OFFSET_T *offsets, int length) {
             // need to check padding works as effective length changes and so cannot assume
             // lacing OK (in cases when spokes "outside" normal range).
             for (int i = 0; i < MAX_LENGTH - length + 1; ++i) {
-                write_pattern_a(offsets, half, i);
+                write_pattern_ab(offsets, half, 'A', i);
                 count++;
             }
         }
@@ -261,14 +261,14 @@ void search_a() {
                 while (ok) {
                     offset = offsets[i];
                     // test if lacing ok
-                    int test = rim, addition = rim_index(offset, -i, length);
+                    int test = rim, addition = RIM_INDEX(offset, -i, length);
                     if (test & addition) {
                         ok = 0;
                         ludebug(dbg, "Failed at %d (rim %d)", addition, rim);
                     } else {
                         test |= addition;
                         if (i) {
-                            addition = rim_index(NEG(offset), i, length);
+                            addition = RIM_INDEX(NEG(offset), i, length);
                             if (test & addition) {
                                 ok = 0;
                                 ludebug(dbg, "Failed (reflected) at %d (rim %d)", addition, test);
@@ -300,6 +300,136 @@ void search_a() {
     luinfo(dbg, "Found %d A group patterns", count);
 }
 
+int candidate_b(OFFSET_T *offsets, int length) {
+
+    int count = 0;
+    int half = length / 2;
+    PATTERN_T pattern = 0;
+
+    for (int i = 0; i < half; ++i) {pattern <<= OFFSET_BITS; pattern |= offsets[half - i - 1];}
+    for (int i = 0; i < half; ++i) {pattern <<= OFFSET_BITS; pattern |= NEG(offsets[i]);}
+
+    ludebug(dbg, "Candidate B length %d offsets %d %d %d -> %x", length, offsets[0], offsets[1], offsets[2], pattern);
+
+    if (GET_SIEVE(pattern)) {
+        ludebug(dbg, "Pattern %x already exists", pattern);
+    } else if (offsets[half-1] > UNUSED_OFFSET) {
+        ludebug(dbg, "Skipping negative leading offset");
+    } else {
+        // TODO - XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+        // need to check padding works as effective length changes and so cannot assume
+        // lacing OK (in cases when spokes "outside" normal range).
+        for (int i = 0; i < MAX_LENGTH - length + 1; ++i) {
+            write_pattern_ab(offsets, half, 'B', i);
+            count++;
+        }
+        set_sieve_all(pattern);
+    }
+
+    return count;
+}
+
+void search_b() {
+
+    luinfo(dbg, "Searching for B group patterns");
+
+    // start with a pair of radial spokes
+    OFFSET_T offsets[LENGTH_B] = {0};
+    int i = 0, offset = 0, length = 2, count = 0;
+    PATTERN_T pattern = 0;
+    HOLES_T rim = 3, hub = rim;
+
+    // run through all possible patterns
+    while (length < MAX_LENGTH) {
+
+        count += candidate_b(offsets, length);
+
+        // remove current spoke(s) from rim
+        offset = offsets[i];
+        // i negated here because increasing i goes left
+        rim ^= RIM_INDEX(offset, -i, length);
+        // add 1 to i here because unlike A we are not symmetric about 0
+        rim ^= RIM_INDEX(NEG(offset), i+1, length);
+        ludebug(dbg, "Rim after removal %d", rim);
+
+        // search for next lacing
+        do {
+
+            // increment
+            offset = offsets[i] + 1;
+            if (offset == UNUSED_OFFSET) offset++;
+            if (offset == OFFSET_LIMIT) offset = 0;   // carry
+            offsets[i] = offset;
+            ludebug(dbg, "Increment at index %d to %d", i, offset);
+
+            if (!offset) {
+
+                // if we carried, then we need to increment the next level
+                // up before we start testing spokes
+                i++;
+                ludebug(dbg, "Index increased to %d", i);
+                if (2 * i + 2 > length) {
+                    // this may mean that we are now considering a longer length
+                    if (rim != 0) {luerror(dbg, "Non-zero rim!"); return;}
+                    length = 2 * i + 2;
+                    hub = (hub << 2) | 3;
+                    ludebug(dbg, "New length %d, rim %d, hub %d", length, rim, hub);
+                } else {
+                    // otherwise, we need to reset lower spokes
+                    for (int j = i; j > 0; --j) offsets[j-1] = 0;
+                    // and remove the one we will increment
+                    offset = offsets[i];
+                    ludebug(dbg, "Index %d offset %d", i, offset);
+                    rim ^= RIM_INDEX(offset, -i, length);
+                    rim ^= RIM_INDEX(NEG(offset), i+1, length);
+                    ludebug(dbg, "Rim after removal (new index) %d", rim);
+                }
+
+            } else {
+
+                // if we can lace new spokes do so, until all laced or we
+                // have a new point to increment from
+                int ok = 1;
+                while (ok) {
+                    offset = offsets[i];
+                    // test if lacing ok
+                    int test = rim, addition = RIM_INDEX(offset, -i, length);
+                    if (test & addition) {
+                        ok = 0;
+                        ludebug(dbg, "Failed at %d (rim %d)", addition, rim);
+                    } else {
+                        test |= addition;
+                        addition = RIM_INDEX(NEG(offset), i+1, length);
+                        if (test & addition) {
+                            ok = 0;
+                            ludebug(dbg, "Failed (reflected) at %d (rim %d)", addition, test);
+                        } else {
+                            test |= addition;
+                        }
+                    }
+                    if (ok) {
+                        rim = test;
+                        ludebug(dbg, "Successful lace at index %d, rim %d", i, rim);
+                        if (i) {
+                            ludebug(dbg, "Decrementing index");
+                            i--;
+                        } else {
+                            ok = 0;
+                        }
+                    } else {
+                        ludebug(dbg, "Failed to lace");
+                    }
+                }
+
+            }
+
+        } while (rim != hub && length < MAX_LENGTH);
+
+    }
+
+    luinfo(dbg, "Found %d B group patterns", count);
+}
+
 void usage(const char *progname) {
     luinfo(dbg, "Search for spoke patterns (max offset %d, max length %d)", MAX_OFFSET, MAX_LENGTH);
     luinfo(dbg, "%s -h     display this message", progname, PATTERN_FILE);
@@ -325,6 +455,7 @@ int main(int argc, char** argv) {
 
         flag_unused();
         search_a();
+        search_b();
 
     }
 
