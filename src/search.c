@@ -8,8 +8,18 @@
 #include "lu/dynamic_memory.h"
 
 
-// these can be changed, but i doubt going any deeper is going to be
-// efficient - time is probably exponential in their product
+// this searches for spoke patterns by testing for successful lacing
+// patterns.  duplicates are avoided using a simple bit sieve.
+
+// in retrospect, for the limits used, a direct enumeration would
+// likely have been fast enough.  but the search used here is
+// significantly more efficient and could, with a different filter
+// for duplicates, be used to search a larger space (eg all patterns
+// for a given wheel size).
+
+
+// these can be changed, but going much deeper requires too much
+// memory for the sieve.
 #define OFFSET_BITS 3
 #define MAX_LENGTH 6
 
@@ -75,6 +85,8 @@ FILE *out = NULL;
 //    ludebug(dbg, "Pattern %d -> sieve set at %d/%d", n, index, shift);
 //}
 
+// this shouldn't be necessary as all candidates are constructed, but
+// it does allow enumeration of possible values from sieve gaps.
 void flag_unused() {
 
     luinfo(dbg, "Setting sieve entries with unused offsets");
@@ -105,7 +117,6 @@ void flag_unused() {
                 pattern |= offsets[MAX_LENGTH - k - 1];
             }
             count++;
-//            ludebug(dbg, "Setting %x (%d)", pattern, count);
             SET_SIEVE(pattern);
         }
 
