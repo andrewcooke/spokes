@@ -52,7 +52,11 @@ FILE *out = NULL;
 #define SET_SIEVE(n) sieve[SIEVE_INDEX(n)] |= (1L << SIEVE_SHIFT(n))
 #define GET_SIEVE(n) 1 & (sieve[SIEVE_INDEX(n)] >> SIEVE_SHIFT(n))
 
-#define RIM_INDEX(offset, index, length) (1L << ((index + offset + length + length) % length))
+// the only mathematical insight is here.  that we can consider a pattern of length L
+// as if it is laced to a tiny wheel with L holes (on one side) and so use modular
+// arithmetic.
+// length is repeated because % is remainder, not modulus, so we need positive values.
+#define RIM_INDEX(offset, index, length) (1L << ((index + offset + 2 * length) % length))
 
 
 //int get_sieve(int n) {
@@ -116,7 +120,8 @@ void set_sieve_all(PATTERN_T pattern) {
     }
 }
 
-void candidate_a(OFFSET_T *offsets, int length) {
+int candidate_a(OFFSET_T *offsets, int length) {
+    int count = 0;
     ludebug(dbg, "Candidate length %d offsets %d %d %d", length, offsets[0], offsets[1], offsets[2]);
     int half = (length + 1) / 2;
     PATTERN_T pattern = 0;
@@ -124,15 +129,19 @@ void candidate_a(OFFSET_T *offsets, int length) {
     for (int i = 1; i < half; ++i) {pattern <<= OFFSET_BITS; pattern |= (offsets[i] | OFFSET_SIGN);}
     if (GET_SIEVE(pattern)) {
         ludebug(dbg, "Pattern %x already exists", pattern);
-        return;
-    }
-    if (length == 1 && offsets[0]) {
-        ludebug(dbg, "Unbalanced %d %d", length, pattern);
     } else {
-        // TODO - write to out
-        for (int i = length; i < MAX_LENGTH; ++i) luinfo(dbg, "New pattern %xA%d", pattern, i - length);
+        if (length == 1 && offsets[0]) {
+            ludebug(dbg, "Unbalanced %d %d", length, pattern);
+        } else {
+            // TODO - write to out
+            for (int i = length; i < MAX_LENGTH; ++i) {
+                luinfo(dbg, "New pattern %xA%d", pattern, i - length);
+                count++;
+            }
+        }
+        set_sieve_all(pattern);
     }
-    set_sieve_all(pattern);
+    return count;
 }
 
 void search_a() {
@@ -148,7 +157,7 @@ void search_a() {
     // run through all possible patterns
     while (length < MAX_LENGTH) {
 
-        candidate_a(offsets, length);
+        count += candidate_a(offsets, length);
 
         // remove current spoke(s) from rim
         offset = offsets[i];
@@ -182,11 +191,13 @@ void search_a() {
                     ludebug(dbg, "New length %d, rim %d, hub %d", length, rim, hub);
                 } else {
                     // otherwise, we need to reset lower spokes
-                    offset = offsets[i];
                     for (int j = i; j > 0; --j) offsets[j-1] = 0;
+                    // and remove the one we will increment
+                    offset = offsets[i];
+                    ludebug(dbg, "Index %d offset %d", i, offset);
                     rim ^= RIM_INDEX(offset, -i, length);
                     if (i) rim ^= RIM_INDEX(-offset, i, length);
-                    ludebug(dbg, "Rim after removal %d", rim);
+                    ludebug(dbg, "Rim after removal (new index) %d", rim);
                 }
 
             } else {
@@ -197,13 +208,13 @@ void search_a() {
                 while (ok) {
                     offset = offsets[i];
                     // test if lacing ok
-                    int test = rim, addition = RIM_INDEX(offset, i, length);
+                    int test = rim, addition = RIM_INDEX(offset, -i, length);
                     if (test & addition) {
                         ok = 0;
                     } else {
                         test |= addition;
                         if (i) {
-                            addition = RIM_INDEX(-offset, -i, length);
+                            addition = RIM_INDEX(-offset, i, length);
                             if (test & addition) {
                                 ok = 0;
                             } else {
