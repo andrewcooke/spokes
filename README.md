@@ -133,8 +133,8 @@ Instead of writing these patterns out as type C, I add the number of
 extra radial spokes after the pattern letter.  So Adapted Crow's Foot
 is written as 2,0A1 (ordinary Crow's Foot is 2,0A).
 
-For consistency, C patterns (if any) with trailing zeroes are also
-written in this way.
+For consistency, C patterns (if any - TODO) with trailing zeroes are
+also written in this way.
 
 #### Preferred Names
 
