@@ -32,6 +32,7 @@
 #define MAX_OFFSET (UNUSED_OFFSET - 1)
 #define OFFSET_VALUE MAX_OFFSET
 #define OFFSET_LIMIT (1L << OFFSET_BITS)
+#define NEG(o) (o ^ OFFSET_SIGN)
 #define LENGTH_A ((MAX_LENGTH + 1) / 2)
 #define LENGTH_B (MAX_LENGTH / 2)
 #define LENGTH_C MAX_LENGTH
@@ -84,6 +85,15 @@ FILE *out = NULL;
 //    SET_SIEVE(n);
 //    ludebug(dbg, "Pattern %d -> sieve set at %d/%d", n, index, shift);
 //}
+
+int rim_index(OFFSET_T offset, int index, int length) {
+    int sign = offset & OFFSET_SIGN;
+    int value = offset & OFFSET_VALUE;
+    ludebug(dbg, "Offset %d -> value %d sign %d", offset, value, sign);
+    int rim = 1L << ((index + (sign ? -1 : 1) * value + 2 * length) % length);
+    ludebug(dbg, "Offset %d at index %d -> rim %d", sign ? -value : value, index, rim);
+    return rim;
+}
 
 // this shouldn't be necessary as all candidates are constructed, but
 // it does allow enumeration of possible values from sieve gaps.
@@ -174,6 +184,9 @@ int candidate_a(OFFSET_T *offsets, int length) {
         if (length == 1 && offsets[0]) {
             ludebug(dbg, "Unbalanced %d %d", length, pattern);
         } else {
+            // TODO - XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+            // need to check padding works as effective length changes and so cannot assume
+            // lacing OK (in cases when spokes "outside" normal range).
             for (int i = 0; i < MAX_LENGTH - length + 1; ++i) {
                 write_pattern_a(offsets, half, i);
                 count++;
@@ -204,7 +217,7 @@ void search_a() {
         offset = offsets[i];
         // i negated here because increasing i goes left
         rim ^= RIM_INDEX(offset, -i, length);
-        if (i) rim ^= RIM_INDEX(-offset, i, length);
+        if (i) rim ^= RIM_INDEX(NEG(offset), i, length);
         ludebug(dbg, "Rim after removal %d", rim);
 
         // search for next lacing
@@ -236,7 +249,7 @@ void search_a() {
                     offset = offsets[i];
                     ludebug(dbg, "Index %d offset %d", i, offset);
                     rim ^= RIM_INDEX(offset, -i, length);
-                    if (i) rim ^= RIM_INDEX(-offset, i, length);
+                    if (i) rim ^= RIM_INDEX(NEG(offset), i, length);
                     ludebug(dbg, "Rim after removal (new index) %d", rim);
                 }
 
@@ -248,15 +261,17 @@ void search_a() {
                 while (ok) {
                     offset = offsets[i];
                     // test if lacing ok
-                    int test = rim, addition = RIM_INDEX(offset, -i, length);
+                    int test = rim, addition = rim_index(offset, -i, length);
                     if (test & addition) {
                         ok = 0;
+                        ludebug(dbg, "Failed at %d (rim %d)", addition, rim);
                     } else {
                         test |= addition;
                         if (i) {
-                            addition = RIM_INDEX(-offset, i, length);
+                            addition = rim_index(NEG(offset), i, length);
                             if (test & addition) {
                                 ok = 0;
+                                ludebug(dbg, "Failed (reflected) at %d (rim %d)", addition, test);
                             } else {
                                 test |= addition;
                             }
