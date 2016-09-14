@@ -154,7 +154,8 @@ To avoid duplication I use the following rules:
 
 * Always start with a positive offset (any pattern can be "reversed"
   by changing the sign of all offsets - this is equivalent to lacing
-  the pattern anti-clockwise instead of clockwise).
+  the pattern anti-clockwise instead of clockwise).  TODO - something
+  wrong here....  consider A groups.
 
 * The above may still not exclude all duplications.  So I also check
   for rotations of C patterns and discard anything that can be

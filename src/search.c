@@ -17,12 +17,17 @@
 
 // derived sizes
 #define PATTERN_BITS (OFFSET_BITS * MAX_LENGTH)
-#define UNUSED_OFFSET (1 << (OFFSET_BITS - 1))
+#define UNUSED_OFFSET (1L << (OFFSET_BITS - 1))
+#define OFFSET_SIGN UNUSED_OFFSET
 #define MAX_OFFSET (UNUSED_OFFSET - 1)
-#define OFFSET_LIMIT (1 << OFFSET_BITS)
+#define OFFSET_LIMIT (1L << OFFSET_BITS)
 #define LENGTH_A ((MAX_LENGTH + 1) / 2)
 #define LENGTH_B (MAX_LENGTH / 2)
 #define LENGTH_C MAX_LENGTH
+#define PATTERN_RIGHT_MASK (OFFSET_LIMIT - 1)
+#define PATTERN_LEFT_MASK (((1L << PATTERN_BITS) - 1) ^ PATTERN_RIGHT_MASK)
+#define LEFT_ROTATION OFFSET_BITS
+#define RIGHT_ROTATION (PATTERN_BITS - LEFT_ROTATION)
 
 // all these are likely best as uint64 for fast access
 #define SIEVE_T uint64_t
@@ -38,17 +43,32 @@ FILE *out = NULL;
 
 // more derived sizes
 #define SIEVE_WIDTH (8 * sizeof(*sieve))
-#define SIEVE_LEN_BITS (1 << (PATTERN_BITS - 1))
+#define SIEVE_LEN_BITS (1L << (PATTERN_BITS - 1))
 #define SIEVE_LEN ((SIEVE_LEN_BITS + (SIEVE_WIDTH - 1)) / SIEVE_WIDTH)
 #define SIEVE_LEN_BYTES (SIEVE_LEN * 8)
 
 #define SIEVE_INDEX(n) (n / SIEVE_WIDTH)
 #define SIEVE_SHIFT(n) (n - SIEVE_WIDTH * SIEVE_INDEX(n))
-#define SET_SIEVE(n) sieve[SIEVE_INDEX(n)] |= 1 << SIEVE_SHIFT(n)
+#define SET_SIEVE(n) sieve[SIEVE_INDEX(n)] |= (1L << SIEVE_SHIFT(n))
 #define GET_SIEVE(n) 1 & (sieve[SIEVE_INDEX(n)] >> SIEVE_SHIFT(n))
 
-#define RIM_INDEX(offset, index, length) (1 << ((index + offset + length + length) % length))
+#define RIM_INDEX(offset, index, length) (1L << ((index + offset + length + length) % length))
 
+
+//int get_sieve(int n) {
+//    int index = SIEVE_INDEX(n);
+//    int shift = SIEVE_SHIFT(n);
+//    int s = GET_SIEVE(n);
+//    ludebug(dbg, "Pattern %d -> sieve %d at %d/%d", n, s, index, shift);
+//    return s;
+//}
+//
+//void set_sieve(int n) {
+//    int index = SIEVE_INDEX(n);
+//    int shift = SIEVE_SHIFT(n);
+//    SET_SIEVE(n);
+//    ludebug(dbg, "Pattern %d -> sieve set at %d/%d", n, index, shift);
+//}
 
 void flag_unused() {
 
@@ -79,14 +99,40 @@ void flag_unused() {
                 pattern <<= OFFSET_BITS;
                 pattern |= offsets[MAX_LENGTH - k - 1];
             }
+            count++;
 //            ludebug(dbg, "Setting %x (%d)", pattern, count);
             SET_SIEVE(pattern);
-            count++;
         }
 
     }
 
     luinfo(dbg, "Set %d (/%d = %2.0f%%)  entries", count, SIEVE_LEN_BITS, count * 100.0 / SIEVE_LEN_BITS);
+}
+
+void set_sieve_all(PATTERN_T pattern) {
+    for (int i = 0; i < MAX_LENGTH; ++i) {
+        SET_SIEVE(pattern);
+        pattern = ((pattern & PATTERN_LEFT_MASK) >> LEFT_ROTATION) | ((pattern & PATTERN_RIGHT_MASK) << RIGHT_ROTATION);
+    }
+}
+
+void candidate_a(OFFSET_T *offsets, int length) {
+    int half = (length + 1) / 2;
+    PATTERN_T pattern;
+    for (int i = 0; i < half; ++i) {pattern <<= OFFSET_BITS; pattern |= offsets[half - i - 1];}
+    for (int i = 1; i < half; ++i) {pattern <<= OFFSET_BITS; pattern |= (offsets[i] | OFFSET_SIGN);}
+    if (GET_SIEVE(pattern)) {
+        ludebug(dbg, "Pattern %x already exists", pattern);
+        return;
+    }
+    if (length == 1 && offsets[0]) {
+        ludebug(dbg, "Unbalanced %d %d", length, pattern);
+    } else {
+        ludebug(dbg, "Length %d offsets %d %d %d", length, offsets[0], offsets[1], offsets[2]);
+        // TODO - write to out
+        for (int i = length; i < MAX_LENGTH; ++i) luinfo(dbg, "New pattern %xA%d", pattern, i - length);
+    }
+    set_sieve_all(pattern);
 }
 
 void search_a() {
@@ -102,14 +148,13 @@ void search_a() {
     // run through all possible patterns
     while (length < MAX_LENGTH) {
 
-        // TODO - sieve
-        // TODO - write output here
-        ludebug(dbg, "Pattern? length %d offsets %d %d %d rim %d", length, offsets[0], offsets[1], offsets[2], rim);
+        candidate_a(offsets, length);
 
         // remove current spoke(s) from rim
         offset = offsets[i];
-        rim ^= RIM_INDEX(offset, i, length);
-        if (i) rim ^= RIM_INDEX(-offset, -i, length);
+        // i negated here because increasing i goes left
+        rim ^= RIM_INDEX(offset, -i, length);
+        if (i) rim ^= RIM_INDEX(-offset, i, length);
         ludebug(dbg, "rim after removal %d", rim);
 
         // search for next lacing
@@ -128,17 +173,19 @@ void search_a() {
                 // up before we start testing spokes
                 i++;
                 ludebug(dbg, "Index increased to %d", i);
-                // this may mean that we are now considering a longer length
                 if (2 * i + 1 > length) {
+                    // this may mean that we are now considering a longer length
                     if (rim != 0) {luerror(dbg, "Non-zero rim!"); return;}
                     if (offsets[i] != 0) {luerror(dbg, "Non-zero offset!"); return;}
                     length = 2 * i + 1;
                     hub = (hub << 2) | 3;
                     ludebug(dbg, "New length %d, rim %d, hub %d", length, rim, hub);
                 } else {
+                    // otherwise, we need to reset lower spokes
                     offset = offsets[i];
-                    rim ^= RIM_INDEX(offset, i, length);
-                    if (i) rim ^= RIM_INDEX(-offset, -i, length);
+                    for (int j = i; j > 0; --j) offsets[j-1] = 0;
+                    rim ^= RIM_INDEX(offset, -i, length);
+                    if (i) rim ^= RIM_INDEX(-offset, i, length);
                     ludebug(dbg, "Rim after removal %d", rim);
                 }
 
@@ -171,7 +218,6 @@ void search_a() {
                             ludebug(dbg, "Decrementing index");
                             i--;
                         } else {
-                            ludebug(dbg, "Exiting: rim %d, hub %d", rim, hub);
                             ok = 0;
                         }
                     } else {
