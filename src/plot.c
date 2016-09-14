@@ -135,9 +135,9 @@ void draw_spoke(cairo_t *cr, int hub, int offset, float r_hub, float r_rim, int 
     cairo_stroke(cr);
 }
 
-void draw_pattern(cairo_t *cr, int *offsets, int length, float r_hub, float r_rim, int holes, int start) {
+void draw_pattern(cairo_t *cr, int *offsets, int length, float r_hub, float r_rim, int holes, int start, int direction) {
     for (int i = 0; i < length; ++i) {
-        draw_spoke(cr, start + 2 * i, offsets[i], r_hub, r_rim, holes);
+        draw_spoke(cr, start + 2 * i * direction, offsets[i] * direction, r_hub, r_rim, holes);
     }
 }
 
@@ -146,9 +146,9 @@ int draw(int *offsets, int length, int holes, const char *path) {
     LU_STATUS;
     cairo_surface_t *surface;
     cairo_t *cr;
-    int nx = 300, ny = 300;
-    float r_hub = 0.15, r_rim = 0.9, wheel_width = 0.03, grey = 0.5;
-    float spoke_width = 0.01, red = 0.3;
+    int nx = 200, ny = 200;
+    float r_hub = 0.15, r_rim = 0.9, wheel_width = 0.03, wheel_grey = 0.5;
+    float spoke_width = 0.015, red = 0.3, spoke_grey = 0.7;
 
     surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, nx, ny);
     cr = cairo_create(surface);
@@ -160,22 +160,22 @@ int draw(int *offsets, int length, int holes, const char *path) {
     cairo_translate(cr, nx/2, ny/2);
     cairo_scale(cr, nx/2, ny/2);
 
+    cairo_set_line_width(cr, wheel_width);
+    cairo_set_source_rgb(cr, wheel_grey, wheel_grey, wheel_grey);
+    draw_circle(cr, r_hub);
+    draw_circle(cr, r_rim);
+
     cairo_set_line_width(cr, spoke_width);
-    cairo_set_source_rgb(cr, grey, grey, grey);
+    cairo_set_source_rgb(cr, spoke_grey, spoke_grey, spoke_grey);
     for (int i = 0; i < holes / (2 * length); ++i) {
-        draw_pattern(cr, offsets, length, r_hub, r_rim, holes, 2 * i * length + 1);
+        draw_pattern(cr, offsets, length, r_hub, r_rim, holes, 2 * i * length + 1, -1);
     }
     cairo_set_source_rgb(cr, 0, 0, 0);
     for (int i = 1; i < holes / (2 * length); ++i) {
-        draw_pattern(cr, offsets, length, r_hub, r_rim, holes, 2 * i * length);
+        draw_pattern(cr, offsets, length, r_hub, r_rim, holes, 2 * i * length, 1);
     }
     cairo_set_source_rgb(cr, red, 0, 0);
-    draw_pattern(cr, offsets, length, r_hub, r_rim, holes, 0);
-
-    cairo_set_line_width(cr, wheel_width);
-    cairo_set_source_rgb(cr, grey, grey, grey);
-    draw_circle(cr, r_hub);
-    draw_circle(cr, r_rim);
+    draw_pattern(cr, offsets, length, r_hub, r_rim, holes, 0, 1);
 
     cairo_surface_write_to_png(surface, path);
 

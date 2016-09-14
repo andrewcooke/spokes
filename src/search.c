@@ -20,6 +20,7 @@
 #define UNUSED_OFFSET (1L << (OFFSET_BITS - 1))
 #define OFFSET_SIGN UNUSED_OFFSET
 #define MAX_OFFSET (UNUSED_OFFSET - 1)
+#define OFFSET_VALUE MAX_OFFSET
 #define OFFSET_LIMIT (1L << OFFSET_BITS)
 #define LENGTH_A ((MAX_LENGTH + 1) / 2)
 #define LENGTH_B (MAX_LENGTH / 2)
@@ -56,7 +57,7 @@ FILE *out = NULL;
 // as if it is laced to a tiny wheel with L holes (on one side) and so use modular
 // arithmetic.
 // length is repeated because % is remainder, not modulus, so we need positive values.
-#define RIM_INDEX(offset, index, length) (1L << ((index + offset + 2 * length) % length))
+#define RIM_INDEX(offset, index, length) (1L << ((index + (offset & OFFSET_SIGN ? -1 : 1) * (offset & OFFSET_VALUE) + 2 * length) % length))
 
 
 //int get_sieve(int n) {
@@ -120,27 +121,56 @@ void set_sieve_all(PATTERN_T pattern) {
     }
 }
 
+void write_pattern_a(OFFSET_T *offsets, int length, int padding) {
+
+    char buffer[3*MAX_LENGTH+3], *p;
+
+    p = buffer;
+    for (int i = 0; i < length; ++i) {
+        if (i) p += sprintf(p, ",");
+        if (offsets[length - i - 1] > UNUSED_OFFSET) {
+            p += sprintf(p, "-%d", offsets[length - i - 1] - UNUSED_OFFSET);
+        } else {
+            p += sprintf(p, "%d", offsets[length - i - 1]);
+        }
+    }
+    *(p++) = 'A';
+    if (padding) p += sprintf(p, "%d", padding);
+    *p = '\0';
+
+    luinfo(dbg, "Writing %s", buffer);
+    fprintf(out, "%s\n", buffer);
+}
+
 int candidate_a(OFFSET_T *offsets, int length) {
+
     int count = 0;
-    ludebug(dbg, "Candidate length %d offsets %d %d %d", length, offsets[0], offsets[1], offsets[2]);
     int half = (length + 1) / 2;
     PATTERN_T pattern = 0;
+
+    ludebug(dbg, "Candidate length %d offsets %d %d %d", length, offsets[0], offsets[1], offsets[2]);
+
     for (int i = 0; i < half; ++i) {pattern <<= OFFSET_BITS; pattern |= offsets[half - i - 1];}
     for (int i = 1; i < half; ++i) {pattern <<= OFFSET_BITS; pattern |= (offsets[i] | OFFSET_SIGN);}
+
     if (GET_SIEVE(pattern)) {
         ludebug(dbg, "Pattern %x already exists", pattern);
+    } else if (offsets[half-1] > UNUSED_OFFSET) {
+        ludebug(dbg, "Skipping negative leading offset");
+    } else if (offsets[0]) {
+        ludebug(dbg, "Skipping non-radial central spoke");
     } else {
         if (length == 1 && offsets[0]) {
             ludebug(dbg, "Unbalanced %d %d", length, pattern);
         } else {
-            // TODO - write to out
-            for (int i = length; i < MAX_LENGTH; ++i) {
-                luinfo(dbg, "New pattern %xA%d", pattern, i - length);
+            for (int i = 0; i < MAX_LENGTH - length + 1; ++i) {
+                write_pattern_a(offsets, half, i);
                 count++;
             }
         }
         set_sieve_all(pattern);
     }
+
     return count;
 }
 
@@ -172,7 +202,7 @@ void search_a() {
             // increment
             offset = offsets[i] + 1;
             if (offset == UNUSED_OFFSET) offset++;
-            if (offset == OFFSET_LIMIT) offset = 0;  // carry
+            if (offset == OFFSET_LIMIT) offset = 0;   // carry
             offsets[i] = offset;
             ludebug(dbg, "Increment at index %d to %d", i, offset);
 
@@ -185,7 +215,6 @@ void search_a() {
                 if (2 * i + 1 > length) {
                     // this may mean that we are now considering a longer length
                     if (rim != 0) {luerror(dbg, "Non-zero rim!"); return;}
-                    if (offsets[i] != 0) {luerror(dbg, "Non-zero offset!"); return;}
                     length = 2 * i + 1;
                     hub = (hub << 2) | 3;
                     ludebug(dbg, "New length %d, rim %d, hub %d", length, rim, hub);
