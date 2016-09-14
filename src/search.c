@@ -95,8 +95,8 @@ FILE *out = NULL;
 
 #define SIEVE_INDEX(n) (n / SIEVE_WIDTH)
 #define SIEVE_SHIFT(n) (n - SIEVE_WIDTH * SIEVE_INDEX(n))
-#define SET_SIEVE(n) sieve[SIEVE_INDEX(n)] |= (1L << SIEVE_SHIFT(n))
-#define GET_SIEVE(n) 1 & (sieve[SIEVE_INDEX(n)] >> SIEVE_SHIFT(n))
+#define SET_SIEVE(n) (sieve[SIEVE_INDEX(n)] |= (1L << SIEVE_SHIFT(n)))
+#define GET_SIEVE(n) (1 & (sieve[SIEVE_INDEX(n)] >> SIEVE_SHIFT(n)))
 
 // the only mathematical insight is here.  that we can consider a pattern of length L
 // as if it is laced to a tiny wheel with L holes (on one side) and so use modular
@@ -197,7 +197,7 @@ void set_sieve_all_rotn(PATTERN_T pattern, int length) {
 void set_sieve_all(PATTERN_T pattern, int length) {
     PATTERN_T submit = 0;
     int submit_length = 0;
-    while (submit_length + length < MAX_LENGTH) {
+    while (submit_length + length <= MAX_LENGTH) {
         submit = (submit << (length * OFFSET_BITS)) | pattern;
         submit_length += length;
         set_sieve_all_rotn(submit, submit_length);
@@ -246,11 +246,12 @@ int candidate_a(OFFSET_T *offsets, int length) {
         int unbalanced = length == 1 && offsets[0];
         if (unbalanced) ludebug(dbg, "Unbalanced %d %d", length, pattern);
         for (int i = 0; i < MAX_LENGTH - length + 1; ++i) {
-            if (!unbalanced && check_lacing(pattern << i, length + i)) {
+            PATTERN_T padded = pattern << (i * OFFSET_BITS);
+            if (!unbalanced && !GET_SIEVE(padded) && check_lacing(padded, length + i)) {
                 write_pattern_ab(offsets, half, 'A', i);
                 count++;
             }
-            set_sieve_all(pattern << i, length + i);
+            set_sieve_all(padded, length + i);
         }
     }
 
@@ -268,7 +269,7 @@ void search_a() {
     HOLES_T rim = 1, hub = rim;
 
     // run through all possible patterns
-    while (length < MAX_LENGTH) {
+    while (length <= MAX_LENGTH) {
 
         count += candidate_a(offsets, length);
 
@@ -376,11 +377,12 @@ int candidate_b(OFFSET_T *offsets, int length) {
         ludebug(dbg, "Skipping negative leading offset");
     } else {
         for (int i = 0; i < MAX_LENGTH - length + 1; ++i) {
-            if (check_lacing(pattern << i, length + i)) {
+            PATTERN_T padded = pattern << (i * OFFSET_BITS);
+            if (!GET_SIEVE(padded) && check_lacing(padded, length + i)) {
                 write_pattern_ab(offsets, half, 'B', i);
                 count++;
             }
-            set_sieve_all(pattern << i, length + i);
+            set_sieve_all(padded, length + i);
         }
     }
 
@@ -398,7 +400,7 @@ void search_b() {
     HOLES_T rim = 3, hub = rim;
 
     // run through all possible patterns
-    while (length < MAX_LENGTH) {
+    while (length <= MAX_LENGTH) {
 
         count += candidate_b(offsets, length);
 
