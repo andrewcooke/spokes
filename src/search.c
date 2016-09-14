@@ -117,8 +117,9 @@ void set_sieve_all(PATTERN_T pattern) {
 }
 
 void candidate_a(OFFSET_T *offsets, int length) {
+    ludebug(dbg, "Candidate length %d offsets %d %d %d", length, offsets[0], offsets[1], offsets[2]);
     int half = (length + 1) / 2;
-    PATTERN_T pattern;
+    PATTERN_T pattern = 0;
     for (int i = 0; i < half; ++i) {pattern <<= OFFSET_BITS; pattern |= offsets[half - i - 1];}
     for (int i = 1; i < half; ++i) {pattern <<= OFFSET_BITS; pattern |= (offsets[i] | OFFSET_SIGN);}
     if (GET_SIEVE(pattern)) {
@@ -128,7 +129,6 @@ void candidate_a(OFFSET_T *offsets, int length) {
     if (length == 1 && offsets[0]) {
         ludebug(dbg, "Unbalanced %d %d", length, pattern);
     } else {
-        ludebug(dbg, "Length %d offsets %d %d %d", length, offsets[0], offsets[1], offsets[2]);
         // TODO - write to out
         for (int i = length; i < MAX_LENGTH; ++i) luinfo(dbg, "New pattern %xA%d", pattern, i - length);
     }
@@ -155,7 +155,7 @@ void search_a() {
         // i negated here because increasing i goes left
         rim ^= RIM_INDEX(offset, -i, length);
         if (i) rim ^= RIM_INDEX(-offset, i, length);
-        ludebug(dbg, "rim after removal %d", rim);
+        ludebug(dbg, "Rim after removal %d", rim);
 
         // search for next lacing
         do {
