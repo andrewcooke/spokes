@@ -275,7 +275,7 @@ in red.
 
 ### Common Names
 
-| Pattern Name | Common Names |
+| Pattern Name | Common Name  |
 | ------------ | ------------ |
 | 0A           | Radial       |
 | 2,0A         | Crow's Foot  |
