@@ -500,6 +500,10 @@ This catalogue is restricted to:
   of the hub to the other (many rims are drilled to reflect this
   practice).  See [spoke offsets](#spoke-offsets).
 
+* Patterns where (except for 0A) there is at least one spoke is offset
+  in the "other" direction (so the pattern cannot "unwind" when the
+  spokes are tightened).
+
 * [Valid](#validity) patterns.
 
 * Spoke [offsets](#spoke-offsets) of 3 (or less).
