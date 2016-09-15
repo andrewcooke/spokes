@@ -315,7 +315,7 @@ So 2,0A1 consists of
 
 * a single "extra" radial spoke (the trailing "1"),
 
-and so is better known as the Adapated Crow's Foot.
+and so is better known as the Extended (or Adapated) Crow's Foot.
 
 To write this software and organise the results into the catalogue
 above I have had to invent some terms.  My apologies if these are
@@ -386,12 +386,12 @@ When you have a pattern that defines a "slice of pie" you can usually
 make a new pattern by adding another radial spoke to one side.
 
 These patterns aren't very interesting, but can sometimes be useful.
-For example, the Adapted Crow's Foot pattern has an extra radial
+For example, the Extended Crow's Foot pattern has an extra radial
 spoke, making its length 4 (ordinary Crow's Foot has 3 spokes in a
 "slice of pie").
 
 Instead of writing these patterns out as type C, I add the number of
-extra radial spokes after the pattern letter.  So Adapted Crow's Foot
+extra radial spokes after the pattern letter.  So Extended Crow's Foot
 is written as 2,0A1 (ordinary Crow's Foot is 2,0A).
 
 For consistency, C patterns (if any - TODO) with trailing zeroes are
