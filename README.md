@@ -25,16 +25,18 @@ patterns are unsafe or impractical**.
 ## Catalogue
 
 <table>
-<tr><td>left</td><td>right</td></tr>
-<tr><td colspan="2">contents</td></tr>
-</table>
-<table>
-<tr><td>left</td><td>right</td></tr>
-<tr><td colspan="2">contents</td></tr>
-</table>
-<table>
-<tr><td>left</td><td>right</td></tr>
-<tr><td colspan="2">contents</td></tr>
+<tr>
+<td>2,0A</td><td>3</td>
+<td>2,01A</td><td>4</td>
+<td>2,02A</td><td>5</td>
+<td>2,03A</td><td>6</td>
+</tr>
+<tr>
+<td colspan="2"><img src="img/20A.png"/></td>
+<td colspan="2"><img src="img/20A1.png"/></td>
+<td colspan="2"><img src="img/20A2.png"/></td>
+<td colspan="2"><img src="img/20A3.png"/></td>
+</tr.
 </table>
 
 ## Notes
