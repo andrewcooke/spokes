@@ -340,7 +340,7 @@ describing the whole wheel we can describe just a single occurrence of
 the pattern - a single "slice of the pie".
 
 The number of spokes in the slice is called the *length* of the
-pattern (see [rim compatability](#rim-compatibility)).
+pattern (see [rim compatability](#rim-compatability)).
 
 Sometimes I use the word "pattern" to refer to an entire wheel, and
 sometimes to just the "pie slice".  Hopefully this will be clear from
