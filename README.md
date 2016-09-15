@@ -152,13 +152,13 @@ in red.  Any common name I know of is added as a footnote.
 </tr>
 <tr>
 <td colspan="2"><img src="img/1B4.png"/></td>
-<td colspan="2">2 Cross<img src="img/2B.png"/></td>
+<td colspan="2"><img src="img/2B.png"/></td>
 <td colspan="2"><img src="img/3B.png"/></td>
 <td colspan="2"><img src="img/3B1.png"/></td>
 </tr>
 <tr>
 <td colspan="2"></td>
-<td colspan="2"></td>
+<td colspan="2">2 Cross</td>
 <td colspan="2">3 Cross</td>
 <td colspan="2"></td>
 </tr>
