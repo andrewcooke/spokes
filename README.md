@@ -25,6 +25,8 @@ patterns are unsafe or impractical**.
 
 ## Catalogue
 
+*Still incompete* - I need to search for the group C patterns.
+
 For each pattern, the name is top left and the number of spokes in the
 pattern top right.  An example wheel (of 20, 32 or 36 spokes,
 depending on the pattern size) is shown, with the pattern highlighted
