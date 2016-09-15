@@ -37,6 +37,12 @@ patterns are unsafe or impractical**.
 <td colspan="2"><img src="img/20A2.png"/></td>
 <td colspan="2"><img src="img/20A3.png"/></td>
 </tr>
+<tr>
+<td colspan="2"></td>
+<td colspan="2">Commentary here</td>
+<td colspan="2"></td>
+<td colspan="2"></td>
+</tr>
 </table>
 
 ## Notes
