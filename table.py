@@ -25,10 +25,5 @@ for i in range(n // ncol):
     for j in range(ncol):
         print('<td colspan="2"><img src="img/%s.png"/></td>' % sub(',', '', data[ncol*i+j][0]))
     print('</tr>')
-    print('<tr>')
-    for j in range(ncol):
-        print('<td colspan="2"></td>')
-    print('</tr>')
-
 
 print('</table>')
