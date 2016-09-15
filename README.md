@@ -1,11 +1,11 @@
 
 # A Catalogue Of Spoke Patterns
 
-This will be a [complete](#complete) catalogue of [valid](#validity)
-spoke patterns to [length](#pattern-length) 6 with
-[offsets](#spoke-offsets) of 3 or less.  There is no guarantee of
-[safety or practicality](#safety-and-practicality) - in fact, **some
-patterns are unsafe or impractical**.
+This is a [complete](#complete) catalogue of [valid](#validity) spoke
+patterns to [length](#pattern-length) 6 with [offsets](#spoke-offsets)
+of 3 or less.  There is no guarantee of [safety or
+practicality](#safety-and-practicality) - in fact, **some patterns are
+unsafe or impractical**.
 
 ## Contents
 
@@ -393,7 +393,9 @@ three groups:
   symmetric as described above (but see [radial
   padding](#radial-padding) below).
 
-  I write these patterns out completely.  For example TODO.
+  I write these patterns out completely.  For example 2,2,-1,-3C has
+  spokes of offset 2, 2, -1 and -3 (ie the 1 and 3 are in the opposite
+  direction to the 2s).
 
 #### Radial Padding
 
@@ -409,8 +411,8 @@ Instead of writing these patterns out as type C, I add the number of
 extra radial spokes after the pattern letter.  So Extended Crow's Foot
 is written as 2,0A1 (ordinary Crow's Foot is 2,0A).
 
-For consistency, C patterns (if any - TODO) with trailing zeroes are
-also written in this way.
+For consistency, C patterns with trailing zeroes are also written in
+this way.
 
 #### Preferred Names
 
@@ -430,8 +432,7 @@ To avoid duplication I use the following rules:
 
 * Always start with a positive offset (any pattern can be "reversed"
   by changing the sign of all offsets - this is equivalent to lacing
-  the pattern anti-clockwise instead of clockwise).  TODO - something
-  wrong here....  consider A groups.
+  the pattern anti-clockwise instead of clockwise).
 
 * The above may still not exclude all duplications.  So I also check
   for rotations of C patterns and discard anything that can be
