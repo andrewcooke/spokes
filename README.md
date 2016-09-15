@@ -26,38 +26,332 @@ patterns are unsafe or impractical**.
 
 <table>
 <tr>
-<td>2,0A</td><td>3</td>
-<td>2,01A</td><td>4</td>
-<td>2,02A</td><td>5</td>
-<td>2,03A</td><td>6</td>
+<td>0A</td>
+<td>1</td>
+<td>2,0A</td>
+<td>3</td>
+<td>2,0A1</td>
+<td>4</td>
+<td>2,0A2</td>
+<td>5</td>
 </tr>
 <tr>
+<td colspan="2"><img src="img/0A.png"/></td>
 <td colspan="2"><img src="img/20A.png"/></td>
 <td colspan="2"><img src="img/20A1.png"/></td>
 <td colspan="2"><img src="img/20A2.png"/></td>
+</tr>
+<tr>
+<td colspan="2"></td>
+<td colspan="2"></td>
+<td colspan="2"></td>
+<td colspan="2"></td>
+</tr>
+<tr>
+<td>2,0A3</td>
+<td>6</td>
+<td>3,0A</td>
+<td>3</td>
+<td>1,3,0A</td>
+<td>5</td>
+<td>1,3,0A1</td>
+<td>6</td>
+</tr>
+<tr>
 <td colspan="2"><img src="img/20A3.png"/></td>
+<td colspan="2"><img src="img/30A.png"/></td>
+<td colspan="2"><img src="img/130A.png"/></td>
+<td colspan="2"><img src="img/130A1.png"/></td>
 </tr>
 <tr>
 <td colspan="2"></td>
-<td colspan="2">Commentary here</td>
+<td colspan="2"></td>
 <td colspan="2"></td>
 <td colspan="2"></td>
 </tr>
 <tr>
-<td>2,0A</td><td>3</td>
-<td>2,01A</td><td>4</td>
-<td>2,02A</td><td>5</td>
-<td>2,03A</td><td>6</td>
+<td>1,-1,0A</td>
+<td>5</td>
+<td>1,-1,0A1</td>
+<td>6</td>
+<td>1,-2,0A</td>
+<td>5</td>
+<td>3,3,0A</td>
+<td>5</td>
 </tr>
 <tr>
-<td colspan="2"><img src="img/20A.png"/></td>
-<td colspan="2"><img src="img/20A1.png"/></td>
-<td colspan="2"><img src="img/20A2.png"/></td>
-<td colspan="2"><img src="img/20A3.png"/></td>
+<td colspan="2"><img src="img/1-10A.png"/></td>
+<td colspan="2"><img src="img/1-10A1.png"/></td>
+<td colspan="2"><img src="img/1-20A.png"/></td>
+<td colspan="2"><img src="img/330A.png"/></td>
 </tr>
 <tr>
 <td colspan="2"></td>
-<td colspan="2">Commentary here</td>
+<td colspan="2"></td>
+<td colspan="2"></td>
+<td colspan="2"></td>
+</tr>
+<tr>
+<td>3,3,0A1</td>
+<td>6</td>
+<td>3,-1,0A</td>
+<td>5</td>
+<td>3,-1,0A1</td>
+<td>6</td>
+<td>3,-2,0A</td>
+<td>5</td>
+</tr>
+<tr>
+<td colspan="2"><img src="img/330A1.png"/></td>
+<td colspan="2"><img src="img/3-10A.png"/></td>
+<td colspan="2"><img src="img/3-10A1.png"/></td>
+<td colspan="2"><img src="img/3-20A.png"/></td>
+</tr>
+<tr>
+<td colspan="2"></td>
+<td colspan="2"></td>
+<td colspan="2"></td>
+<td colspan="2"></td>
+</tr>
+<tr>
+<td>1B</td>
+<td>2</td>
+<td>1B1</td>
+<td>3</td>
+<td>1B2</td>
+<td>4</td>
+<td>1B3</td>
+<td>5</td>
+</tr>
+<tr>
+<td colspan="2"><img src="img/1B.png"/></td>
+<td colspan="2"><img src="img/1B1.png"/></td>
+<td colspan="2"><img src="img/1B2.png"/></td>
+<td colspan="2"><img src="img/1B3.png"/></td>
+</tr>
+<tr>
+<td colspan="2"></td>
+<td colspan="2"></td>
+<td colspan="2"></td>
+<td colspan="2"></td>
+</tr>
+<tr>
+<td>1B4</td>
+<td>6</td>
+<td>2B</td>
+<td>2</td>
+<td>3B</td>
+<td>2</td>
+<td>3B1</td>
+<td>3</td>
+</tr>
+<tr>
+<td colspan="2"><img src="img/1B4.png"/></td>
+<td colspan="2"><img src="img/2B.png"/></td>
+<td colspan="2"><img src="img/3B.png"/></td>
+<td colspan="2"><img src="img/3B1.png"/></td>
+</tr>
+<tr>
+<td colspan="2"></td>
+<td colspan="2"></td>
+<td colspan="2"></td>
+<td colspan="2"></td>
+</tr>
+<tr>
+<td>1,2B</td>
+<td>4</td>
+<td>1,2B1</td>
+<td>5</td>
+<td>1,2B2</td>
+<td>6</td>
+<td>1,3B</td>
+<td>4</td>
+</tr>
+<tr>
+<td colspan="2"><img src="img/12B.png"/></td>
+<td colspan="2"><img src="img/12B1.png"/></td>
+<td colspan="2"><img src="img/12B2.png"/></td>
+<td colspan="2"><img src="img/13B.png"/></td>
+</tr>
+<tr>
+<td colspan="2"></td>
+<td colspan="2"></td>
+<td colspan="2"></td>
+<td colspan="2"></td>
+</tr>
+<tr>
+<td>1,-2B</td>
+<td>4</td>
+<td>2,2B</td>
+<td>4</td>
+<td>2,2B1</td>
+<td>5</td>
+<td>2,2B2</td>
+<td>6</td>
+</tr>
+<tr>
+<td colspan="2"><img src="img/1-2B.png"/></td>
+<td colspan="2"><img src="img/22B.png"/></td>
+<td colspan="2"><img src="img/22B1.png"/></td>
+<td colspan="2"><img src="img/22B2.png"/></td>
+</tr>
+<tr>
+<td colspan="2"></td>
+<td colspan="2"></td>
+<td colspan="2"></td>
+<td colspan="2"></td>
+</tr>
+<tr>
+<td>2,3B</td>
+<td>4</td>
+<td>3,0B</td>
+<td>4</td>
+<td>3,0B1</td>
+<td>5</td>
+<td>3,0B2</td>
+<td>6</td>
+</tr>
+<tr>
+<td colspan="2"><img src="img/23B.png"/></td>
+<td colspan="2"><img src="img/30B.png"/></td>
+<td colspan="2"><img src="img/30B1.png"/></td>
+<td colspan="2"><img src="img/30B2.png"/></td>
+</tr>
+<tr>
+<td colspan="2"></td>
+<td colspan="2"></td>
+<td colspan="2"></td>
+<td colspan="2"></td>
+</tr>
+<tr>
+<td>3,1B</td>
+<td>4</td>
+<td>3,1B1</td>
+<td>5</td>
+<td>3,1B2</td>
+<td>6</td>
+<td>1,1,3B</td>
+<td>6</td>
+</tr>
+<tr>
+<td colspan="2"><img src="img/31B.png"/></td>
+<td colspan="2"><img src="img/31B1.png"/></td>
+<td colspan="2"><img src="img/31B2.png"/></td>
+<td colspan="2"><img src="img/113B.png"/></td>
+</tr>
+<tr>
+<td colspan="2"></td>
+<td colspan="2"></td>
+<td colspan="2"></td>
+<td colspan="2"></td>
+</tr>
+<tr>
+<td>1,1,-2B</td>
+<td>6</td>
+<td>1,1,-3B</td>
+<td>6</td>
+<td>1,2,3B</td>
+<td>6</td>
+<td>1,2,-2B</td>
+<td>6</td>
+</tr>
+<tr>
+<td colspan="2"><img src="img/11-2B.png"/></td>
+<td colspan="2"><img src="img/11-3B.png"/></td>
+<td colspan="2"><img src="img/123B.png"/></td>
+<td colspan="2"><img src="img/12-2B.png"/></td>
+</tr>
+<tr>
+<td colspan="2"></td>
+<td colspan="2"></td>
+<td colspan="2"></td>
+<td colspan="2"></td>
+</tr>
+<tr>
+<td>1,2,-3B</td>
+<td>6</td>
+<td>1,-1,0B</td>
+<td>6</td>
+<td>1,-2,0B</td>
+<td>6</td>
+<td>1,-2,1B</td>
+<td>6</td>
+</tr>
+<tr>
+<td colspan="2"><img src="img/12-3B.png"/></td>
+<td colspan="2"><img src="img/1-10B.png"/></td>
+<td colspan="2"><img src="img/1-20B.png"/></td>
+<td colspan="2"><img src="img/1-21B.png"/></td>
+</tr>
+<tr>
+<td colspan="2"></td>
+<td colspan="2"></td>
+<td colspan="2"></td>
+<td colspan="2"></td>
+</tr>
+<tr>
+<td>2,0,3B</td>
+<td>6</td>
+<td>2,0,-3B</td>
+<td>6</td>
+<td>2,3,3B</td>
+<td>6</td>
+<td>2,3,-2B</td>
+<td>6</td>
+</tr>
+<tr>
+<td colspan="2"><img src="img/203B.png"/></td>
+<td colspan="2"><img src="img/20-3B.png"/></td>
+<td colspan="2"><img src="img/233B.png"/></td>
+<td colspan="2"><img src="img/23-2B.png"/></td>
+</tr>
+<tr>
+<td colspan="2"></td>
+<td colspan="2"></td>
+<td colspan="2"></td>
+<td colspan="2"></td>
+</tr>
+<tr>
+<td>2,3,-3B</td>
+<td>6</td>
+<td>2,-1,2B</td>
+<td>6</td>
+<td>2,-3,3B</td>
+<td>6</td>
+<td>2,-3,-3B</td>
+<td>6</td>
+</tr>
+<tr>
+<td colspan="2"><img src="img/23-3B.png"/></td>
+<td colspan="2"><img src="img/2-12B.png"/></td>
+<td colspan="2"><img src="img/2-33B.png"/></td>
+<td colspan="2"><img src="img/2-3-3B.png"/></td>
+</tr>
+<tr>
+<td colspan="2"></td>
+<td colspan="2"></td>
+<td colspan="2"></td>
+<td colspan="2"></td>
+</tr>
+<tr>
+<td>3,0,3B</td>
+<td>6</td>
+<td>3,3,3B</td>
+<td>6</td>
+<td>3,3,-3B</td>
+<td>6</td>
+<td>3,-1,2B</td>
+<td>6</td>
+</tr>
+<tr>
+<td colspan="2"><img src="img/303B.png"/></td>
+<td colspan="2"><img src="img/333B.png"/></td>
+<td colspan="2"><img src="img/33-3B.png"/></td>
+<td colspan="2"><img src="img/3-12B.png"/></td>
+</tr>
+<tr>
+<td colspan="2"></td>
+<td colspan="2"></td>
 <td colspan="2"></td>
 <td colspan="2"></td>
 </tr>

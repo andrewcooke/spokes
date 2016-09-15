@@ -204,7 +204,7 @@ void set_sieve_all(PATTERN_T pattern, int length) {
     }
 }
 
-void write_pattern_ab(OFFSET_T *offsets, int length, char group, int padding) {
+void write_pattern_ab(OFFSET_T *offsets, int length, char group, int padding, int full_length) {
 
     char buffer[3*MAX_LENGTH+3], *p;
 
@@ -222,7 +222,7 @@ void write_pattern_ab(OFFSET_T *offsets, int length, char group, int padding) {
     *p = '\0';
 
     luinfo(dbg, "Writing %s", buffer);
-    fprintf(out, "%s\n", buffer);
+    fprintf(out, "%s %d\n", buffer, full_length);
 }
 
 int candidate_a(OFFSET_T *offsets, int length) {
@@ -248,7 +248,7 @@ int candidate_a(OFFSET_T *offsets, int length) {
         for (int i = 0; i < MAX_LENGTH - length + 1; ++i) {
             PATTERN_T padded = pattern << (i * OFFSET_BITS);
             if (!unbalanced && !GET_SIEVE(padded) && check_lacing(padded, length + i)) {
-                write_pattern_ab(offsets, half, 'A', i);
+                write_pattern_ab(offsets, half, 'A', i, length + i);
                 count++;
             }
             set_sieve_all(padded, length + i);
@@ -379,7 +379,7 @@ int candidate_b(OFFSET_T *offsets, int length) {
         for (int i = 0; i < MAX_LENGTH - length + 1; ++i) {
             PATTERN_T padded = pattern << (i * OFFSET_BITS);
             if (!GET_SIEVE(padded) && check_lacing(padded, length + i)) {
-                write_pattern_ab(offsets, half, 'B', i);
+                write_pattern_ab(offsets, half, 'B', i, length + i);
                 count++;
             }
             set_sieve_all(padded, length + i);
