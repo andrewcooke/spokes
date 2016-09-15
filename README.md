@@ -47,9 +47,9 @@ in red.  Any common name I know of is added as a footnote.
 <td colspan="2"><img src="img/20A2.png"/></td>
 </tr>
 <tr>
-<td colspan="2"></td>
-<td colspan="2"></td>
-<td colspan="2"></td>
+<td colspan="2">Radial</td>
+<td colspan="2">Crow's foot</td>
+<td colspan="2">Extended Crow's Foot</td>
 <td colspan="2"></td>
 </tr>
 <tr>
@@ -152,14 +152,14 @@ in red.  Any common name I know of is added as a footnote.
 </tr>
 <tr>
 <td colspan="2"><img src="img/1B4.png"/></td>
-<td colspan="2"><img src="img/2B.png"/></td>
+<td colspan="2">2 Cross<img src="img/2B.png"/></td>
 <td colspan="2"><img src="img/3B.png"/></td>
 <td colspan="2"><img src="img/3B1.png"/></td>
 </tr>
 <tr>
 <td colspan="2"></td>
 <td colspan="2"></td>
-<td colspan="2"></td>
+<td colspan="2">3 Cross</td>
 <td colspan="2"></td>
 </tr>
 <tr>
@@ -196,7 +196,7 @@ in red.  Any common name I know of is added as a footnote.
 </tr>
 <tr>
 <td colspan="2"><img src="img/1-2B.png"/></td>
-<td colspan="2"><img src="img/22B.png"/></td>
+<td colspan="2">2 Leading 2 Trailing<img src="img/22B.png"/></td>
 <td colspan="2"><img src="img/22B1.png"/></td>
 <td colspan="2"><img src="img/22B2.png"/></td>
 </tr>
@@ -356,7 +356,7 @@ in red.  Any common name I know of is added as a footnote.
 </tr>
 <tr>
 <td colspan="2"></td>
-<td colspan="2"></td>
+<td colspan="2">3 Leading 3 Trailing</td>
 <td colspan="2"></td>
 <td colspan="2"></td>
 </tr>
