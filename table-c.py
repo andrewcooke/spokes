@@ -13,7 +13,7 @@ n = len(data)
 
 print('<table>')
 
-ncol = 8
+ncol = 7
 
 for i in range((n+ncol-1) // ncol):
     print('<tr>')
@@ -28,7 +28,7 @@ for i in range((n+ncol-1) // ncol):
     print('<tr>')
     for j in range(ncol):
         if (ncol*i+j < n):
-            print('<td colspan="2"><img src="img/%s.png"/></td>' % sub(',', '', data[ncol*i+j][0]))
+            print('<td><img src="img/%s.png"/></td>' % sub(',', '', data[ncol*i+j][0]))
     print('</tr>')
 
 print('</table>')
