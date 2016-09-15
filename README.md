@@ -26,7 +26,12 @@ patterns are unsafe or impractical**.
 
 <table>
 <tr>
-<td>entry 1</td>
+<td>
+<table>
+<tr><td>left</td><td>right</td></tr>
+<tr><td colspan="2">contents</td></tr>
+</table>
+</td>
 <td>entry 2</td>
 </tr>
 </table>
