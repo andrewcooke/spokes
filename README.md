@@ -24,6 +24,11 @@ patterns are unsafe or impractical**.
 
 ## Catalogue
 
+For each pattern, the name is top left and the number of spokes in the
+pattern top right.  An example wheel (of 20, 32 or 36 spokes,
+depending on the pattern size) is shown, with the pattern highlighted
+in red.  Any common name I know of is added as a footnote.
+
 <table>
 <tr>
 <td>0A</td>
