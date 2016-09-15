@@ -1,0 +1,10 @@
+#!/bin/bash
+
+rm img/*
+egrep '(A|B)' patterns.txt > patterns-ab.txt
+for p in `cut -d " " -f 1 patterns-ab.txt`; do src/plot $p; done
+python table-ab.py > table-ab.html
+egrep 'C' patterns.txt > patterns-c.txt
+for p in `cut -d " " -f 1 patterns-c.txt`; do src/plot $p; done
+python table-c.py > table-c.html
+mv *.png img/

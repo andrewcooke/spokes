@@ -13,19 +13,14 @@
 
 lulog *dbg = NULL;
 
-
-int unpack_c(const char *pattern, int **offsets, int *length) {
-    return LU_OK;
-}
-
-int unpack_b(const char *pattern, int **offsets, int *length) {
+int unpack_generic(const char *pattern, int **offsets, int *length, const char stop, int *padding) {
 
     LU_STATUS
 
     const char *p = pattern;
     int sign = 1;
 
-    while (*p != 'B') {
+    while (*p != stop) {
         if (*p == ',') sign = 1;
         else if (*p == '-') sign = -sign;
         else {
@@ -37,16 +32,52 @@ int unpack_b(const char *pattern, int **offsets, int *length) {
         }
         p++;
     }
-    p++;   // drop B
-    if (!(*offsets = realloc(*offsets, (2 * *length) * sizeof(**offsets)))) return LU_ERR_MEM;
-    for (int i = 0; i < *length; ++i) (*offsets)[*length + i] = -(*offsets)[*length - i - 1];
-    *length = 2 * *length;
+    p++;   // drop stop character
     if (*p) {
-        int padding = *p - '0';
+        *padding = *p - '0';
+    } else {
+        *padding = 0;
+    }
+
+    LU_NO_CLEANUP
+}
+
+int apply_padding(int **offsets, int *length, int padding) {
+
+    LU_STATUS
+
+    if (padding) {
         if (!(*offsets = realloc(*offsets, (padding + *length) * sizeof(**offsets)))) return LU_ERR_MEM;
         for (int i = 0; i < padding; ++i) (*offsets)[*length + i] = 0;
         *length = padding + *length;
     }
+
+    LU_NO_CLEANUP
+}
+
+int unpack_c(const char *pattern, int **offsets, int *length) {
+
+    LU_STATUS
+    int padding;
+
+    LU_CHECK(unpack_generic(pattern, offsets, length, 'C', &padding))
+    LU_CHECK(apply_padding(offsets, length, padding))
+
+    LU_NO_CLEANUP
+}
+
+int unpack_b(const char *pattern, int **offsets, int *length) {
+
+    LU_STATUS
+    int padding;
+
+    LU_CHECK(unpack_generic(pattern, offsets, length, 'B', &padding))
+
+    if (!(*offsets = realloc(*offsets, (2 * *length) * sizeof(**offsets)))) return LU_ERR_MEM;
+    for (int i = 0; i < *length; ++i) (*offsets)[*length + i] = -(*offsets)[*length - i - 1];
+    *length = 2 * *length;
+
+    LU_CHECK(apply_padding(offsets, length, padding))
 
     LU_NO_CLEANUP
 }
@@ -54,47 +85,33 @@ int unpack_b(const char *pattern, int **offsets, int *length) {
 int unpack_a(const char *pattern, int **offsets, int *length) {
 
     LU_STATUS
+    int padding;
 
-    const char *p = pattern;
-    int sign = 1;
+    LU_CHECK(unpack_generic(pattern, offsets, length, 'A', &padding))
 
-    while (*p != 'A') {
-        if (*p == ',') sign = 1;
-        else if (*p == '-') sign = -sign;
-        else {
-            int offset = *p - '0';
-            if (!(*offsets = realloc(*offsets, (1 + *length) * sizeof(**offsets)))) return LU_ERR_MEM;
-            (*offsets)[*length] = sign * offset;
-            (*length)++;
-            sign = 1;
-        }
-        p++;
-    }
-    p++;   // drop A
     if ((*offsets)[*length-1]) luwarn(dbg, "Central offset for group A is non-zero");
     if (!(*offsets = realloc(*offsets, (2 * *length - 1) * sizeof(**offsets)))) return LU_ERR_MEM;
     for (int i = 1; i < *length; ++i) (*offsets)[*length + i - 1] = -(*offsets)[*length - i - 1];
     *length = 2 * *length - 1;
-    if (*p) {
-        int padding = *p - '0';
-        if (!(*offsets = realloc(*offsets, (padding + *length) * sizeof(**offsets)))) return LU_ERR_MEM;
-        for (int i = 0; i < padding; ++i) (*offsets)[*length + i] = 0;
-        *length = padding + *length;
-    }
+
+    LU_CHECK(apply_padding(offsets, length, padding))
 
     LU_NO_CLEANUP
 }
 
-int unpack(const char *pattern, int **offsets, int *length) {
+int unpack(const char *pattern, int **offsets, int *length, int *nx, int *ny) {
 
     LU_STATUS
 
     if (strchr(pattern, 'A')) {
         LU_CHECK(unpack_a(pattern, offsets, length));
+        *nx = *ny = 200;
     } else if (strchr(pattern, 'B')) {
         LU_CHECK(unpack_b(pattern, offsets, length));
+        *nx = *ny = 200;
     } else if (strchr(pattern, 'C')) {
         LU_CHECK(unpack_c(pattern, offsets, length));
+        *nx = *ny = 100;
     } else {
         luerror(dbg, "Did not find group type (A, B, C) in %s", pattern);
         status = LU_ERR_ARG;
@@ -170,12 +187,11 @@ void draw_pattern(cairo_t *cr, int *offsets, int length, float r_hub, float r_ri
     }
 }
 
-int draw(int *offsets, int length, int holes, const char *path) {
+int draw(int *offsets, int length, int holes, int nx, int ny, const char *path) {
 
     LU_STATUS;
     cairo_surface_t *surface;
     cairo_t *cr;
-    int nx = 200, ny = 200;
     float r_hub = 0.15, r_rim = 0.9, wheel_width = 0.03, wheel_grey = 0.5;
     float spoke_width = 0.015, red = 0.5, spoke_grey = 0.7;
 
@@ -238,15 +254,15 @@ LU_CLEANUP
 int plot(const char *pattern) {
 
     LU_STATUS;
-    int *offsets = NULL, length = 0, holes = 0;
+    int *offsets = NULL, length = 0, holes = 0, nx = 0, ny = 0;
     char *path = NULL;
 
     luinfo(dbg, "Pattern '%s'", pattern);
-    LU_CHECK(unpack(pattern, &offsets, &length));
+    LU_CHECK(unpack(pattern, &offsets, &length, &nx, &ny));
     LU_CHECK(dump_pattern(offsets, length));
     LU_CHECK(rim_size(length, &holes));
     LU_CHECK(make_path(pattern, &path));
-    LU_CHECK(draw(offsets, length, holes, path));
+    LU_CHECK(draw(offsets, length, holes, nx, ny, path));
 
 LU_CLEANUP
     free(path);

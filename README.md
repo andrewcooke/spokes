@@ -10,6 +10,8 @@ patterns are unsafe or impractical**.
 ## Contents
 
 * [Catalogue](#catalogue)
+  * [Groups A And B](#groups-a-and-b)
+  * [Group C](#group-c)
   * [Common Names](#common-names)
 * [Notes](#notes)
   * [Pattern Names](#pattern-names)
@@ -25,7 +27,7 @@ patterns are unsafe or impractical**.
 
 ## Catalogue
 
-*Still incompete* - I need to search for the group C patterns.
+### Groups A And B
 
 For each pattern, the name is top left and the number of spokes in the
 pattern top right.  An example wheel (of 20, 32 or 36 spokes,
@@ -273,7 +275,19 @@ in red.
 <td colspan="2"><img src="img/33-3B.png"/></td>
 <td colspan="2"><img src="img/3-12B.png"/></td>
 </tr>
+<tr>
+<td>3,-2,2B</td>
+<td>6</td>
+</tr>
+<tr>
+<td colspan="2"><img src="img/3-22B.png"/></td>
+</tr>
 </table>
+
+### Group C
+
+There were so many results for group C that I have placed them on
+a [separate page](group-c.md).
 
 ### Common Names
 
@@ -364,7 +378,7 @@ three groups:
   central radial spoke (offset 0).
 
   I write these patterns omitting the the reflected spokes (but
-  including the middle spoke).  So Crow's foot can be written as 2,0A.
+  including the middle spoke).  So Crow's Foot can be written as 2,0A.
 
 * **B**: Patterns which are symmetric with an even number of spokes
   (so without a central radial spoke).  A very common example is 3 
