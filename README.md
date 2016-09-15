@@ -24,7 +24,12 @@ patterns are unsafe or impractical**.
 
 ## Catalogue
 
-TODO
+<table>
+<tr>
+<td>entry 1</td>
+<td>entry 2</td>
+</tr>
+</table>
 
 ## Notes
 
