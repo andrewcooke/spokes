@@ -24,7 +24,7 @@ patterns are unsafe or impractical**.
 
 ## Catalogue
 
-<table style="border:none">
+<table style="border: 0px">
 <tr>
 <td>
 <table>
