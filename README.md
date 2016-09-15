@@ -24,6 +24,7 @@ patterns are unsafe or impractical**.
   * [Safety And Practicality](#safety-and-practicality)
   * [Completeness](#completeness)
   * [Footnotes](#footnotes)
+* [Running The Code](#running-the-code)
 
 ## Catalogue
 
@@ -518,3 +519,28 @@ come later.  More exactly still, please see the code.
 **<a name="footnote-2">2</a>** - I think this can be shown using
 [modular
 arithmetic](https://en.wikipedia.org/wiki/Modular_arithmetic).
+
+## Running The Code
+
+The code requires the [Cairo graphics
+library](https://www.cairographics.org/) and my
+[liblu](https://github.com/andrewcooke/liblu).  It's an autotools
+project, written in C99 (I hope) and developed on Linux.  So if you're
+lucky you can do something like:
+
+```
+git clone ...
+cd ...
+autoreconf -fi
+./configure
+make
+```
+
+There are two programs - `search` and `plot`.  Both give (minimal)
+help if run with `-h` as a single argument.
+
+As noted in the code, a more efficient way of removing duplicates
+(maybe just a list of known patterns) may be all that is needed to
+exhaustively search for patterns up to the size of the wheel (ie
+completely aperiodic).  However, given how ugly and pointless the
+group C results are already, I've lost the motivation...
