@@ -24,16 +24,17 @@ patterns are unsafe or impractical**.
 
 ## Catalogue
 
-<table style="border: 0px">
-<tr>
-<td>
 <table>
 <tr><td>left</td><td>right</td></tr>
 <tr><td colspan="2">contents</td></tr>
 </table>
-</td>
-<td>entry 2</td>
-</tr>
+<table>
+<tr><td>left</td><td>right</td></tr>
+<tr><td colspan="2">contents</td></tr>
+</table>
+<table>
+<tr><td>left</td><td>right</td></tr>
+<tr><td colspan="2">contents</td></tr>
 </table>
 
 ## Notes
