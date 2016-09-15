@@ -297,7 +297,7 @@ detail, but all you really need to know is:
 * The numbers are spoke offsets.
 
 * For A patterns, reflect the spokes described by the offsets around
-  trailing 0 offset (radial) spoke.
+  the trailing 0 offset (radial) spoke.
 
 * For B patterns, reflect all the spokes.
 
