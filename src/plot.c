@@ -177,7 +177,7 @@ int draw(int *offsets, int length, int holes, const char *path) {
     cairo_t *cr;
     int nx = 200, ny = 200;
     float r_hub = 0.15, r_rim = 0.9, wheel_width = 0.03, wheel_grey = 0.5;
-    float spoke_width = 0.015, red = 0.3, spoke_grey = 0.7;
+    float spoke_width = 0.015, red = 0.5, spoke_grey = 0.7;
 
     surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, nx, ny);
     cr = cairo_create(surface);
