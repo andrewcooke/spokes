@@ -360,7 +360,7 @@ offset 2 reflected around a radial spoke (of offset 0).
 Thinking about symmetry in this way lets us divide spoke patterns into
 three groups:
 
-* **A**: Patterns like Crow's foot, which are symmetric around a 
+* **A**: Patterns like Crow's Foot, which are symmetric around a 
   central radial spoke (offset 0).
 
   I write these patterns omitting the the reflected spokes (but
