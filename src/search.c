@@ -399,10 +399,10 @@ int candidate_c(OFFSET_T *offsets, int length) {
     PATTERN_T pattern = 0;
 
     // remove trailing 0
-//    while (!offsets[0]) {
-//        offsets++;
-//        length--;
-//    }
+    while (!offsets[0]) {
+        offsets++;
+        length--;
+    }
 
     for (int i = 0; i < length; ++i) {pattern <<= OFFSET_BITS; pattern |= offsets[length - i - 1];}
 

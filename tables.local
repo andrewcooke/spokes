@@ -1,6 +1,7 @@
 #!/bin/bash
 
 rm img/*
+rm *.png
 egrep '(A|B)' patterns.txt > patterns-ab.txt
 for p in `cut -d " " -f 1 patterns-ab.txt`; do src/plot $p; done
 python table-ab.py > table-ab.html

@@ -552,3 +552,6 @@ group C results are already, I've lost the motivation...
 
 * Rewrite search 2016-09-17 - changed order and so some names, but not
   total number of results.
+
+* Remove trailing 0 for C 2016-09-17 - changed order and so some
+  names, but not total number of results.
