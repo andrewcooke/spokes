@@ -445,7 +445,7 @@ void search_c() {
 
 void usage(const char *progname) {
     luinfo(dbg, "Search for spoke patterns (max offset %d, max length %d)", MAX_OFFSET, MAX_LENGTH);
-    luinfo(dbg, "%s -h     display this message", progname, PATTERN_FILE);
+    luinfo(dbg, "%s -h     display this message", progname);
     luinfo(dbg, "%s        run a search (output to %s)", progname, PATTERN_FILE);
 }
 
