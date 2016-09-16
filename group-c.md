@@ -1,14 +1,17 @@
 
 # A Catalogue Of Spoke Patterns - Group C
 
-This page contains the unsymmetric group C patterns.  For the
-symmetric group A and B patterns, and background information, please
-see the [main page](README.md).
+This page contains the group C patterns.  For the symmetric group A
+and B patterns, and background information, please see the [main
+page](README.md).
 
 For each pattern the [name](REAMDE.md#pattern-names) and
 [length](REAMDE.md#pattern-length) are given.  Then an example wheel
 (of 20, 32 or 36 spokes, depending on the pattern size) is shown, with
 the pattern highlighted in red.
+
+Note: Since these patterns are asymmetric (within the "slice of pie")
+they probably cannot be built with uniform tension.
 
 <table>
 <tr>
