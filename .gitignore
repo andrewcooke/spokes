@@ -53,8 +53,10 @@ libtool
 .cproject
 .project
 .settings
-patterns*.txt
+*.txt
+*.log
 search
 plot
 table.html
 *.html
+#*

@@ -154,6 +154,9 @@ int rim_size(int length, int *holes) {
     case 9:
         *holes = 36;
         break;
+    case 7:
+        *holes = 28;
+        break;
     case 5:
     case 10:
         *holes = 20;

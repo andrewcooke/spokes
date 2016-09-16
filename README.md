@@ -545,3 +545,9 @@ As noted in the code, a more efficient way of removing duplicates
 exhaustively search for patterns up to the size of the wheel (ie
 completely aperiodic).  However, given how ugly and pointless the
 group C results are already, I've lost the motivation...
+
+### History
+
+* First complete version 2016-09-16
+
+* Rewrite search 2016-09-17
