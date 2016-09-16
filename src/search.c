@@ -396,7 +396,7 @@ void search_b() {
 int candidate_c(OFFSET_T *offsets, int length) {
 
     int count = 0;
-    PATTERN_T pattern = 0;
+    PATTERN_T pattern1 = 0, pattern2 = 0;
 
     // remove trailing 0
     while (!offsets[0]) {
@@ -404,10 +404,14 @@ int candidate_c(OFFSET_T *offsets, int length) {
         length--;
     }
 
-    for (int i = 0; i < length; ++i) {pattern <<= OFFSET_BITS; pattern |= offsets[length - i - 1];}
+    for (int i = 0; i < length; ++i) {pattern1 <<= OFFSET_BITS; pattern1 |= offsets[length - i - 1];}
+    // negate and reverse to give second equivalent pattern
+    // (does not apply to A,B because symmetric)
+    for (int i = 0; i < length; ++i) {pattern2 <<= OFFSET_BITS; pattern2 |= NEG(offsets[i]);}
 
-    ludebug(dbg, "Candidate C length %d offsets %d %d %d %d %d %d -> %x", length,
-            offsets[0], offsets[1], offsets[2], offsets[3], offsets[4], offsets[5], pattern);
+
+    ludebug(dbg, "Candidate C length %d offsets %d %d %d %d %d %d -> %x, %x", length,
+            offsets[0], offsets[1], offsets[2], offsets[3], offsets[4], offsets[5], pattern1, pattern2);
 
     int pos = 0, neg = 0;
     for (int i = 0; i < length; ++i) {
@@ -422,18 +426,26 @@ int candidate_c(OFFSET_T *offsets, int length) {
 
     if (!(pos & neg)) {
         ludebug(dbg, "All in one direction");
-    } else if (GET_SIEVE(pattern)) {
-        ludebug(dbg, "Pattern %x already exists", pattern);
+    } else if (GET_SIEVE(pattern1)) {
+        ludebug(dbg, "Pattern %x already exists", pattern1);
+    } else if (GET_SIEVE(pattern2)) {
+        ludebug(dbg, "Pattern %x already exists", pattern2);
     } else if (!offsets[length-1]) {
         ludebug(dbg, "Skipping zero leading offset");
     } else if (offsets[length-1] > UNUSED_OFFSET) {
         ludebug(dbg, "Skipping negative leading offset");
     } else {
         for (int i = 0; i < MAX_LENGTH - length + 1; ++i) {
-            PATTERN_T padded = pattern << (i * OFFSET_BITS);
+            PATTERN_T padded = pattern1 << (i * OFFSET_BITS);
             if (!GET_SIEVE(padded) && check_lacing(padded, length + i)) {
                 write_pattern(offsets, length, 'C', i, length + i);
                 count++;
+                set_sieve_all(padded, length + i);
+            }
+        }
+        for (int i = 0; i < MAX_LENGTH - length + 1; ++i) {
+            PATTERN_T padded = pattern2 << (i * OFFSET_BITS);
+            if (!GET_SIEVE(padded) && check_lacing(padded, length + i)) {
                 set_sieve_all(padded, length + i);
             }
         }

@@ -548,10 +548,15 @@ group C results are already, I've lost the motivation...
 
 ### History
 
-* First complete version 2016-09-16.
+* 2016-09-16 - First complete version
 
-* Rewrite search 2016-09-17 - changed order and so some names, but not
-  total number of results.
+* 2016-09-17
 
-* Remove trailing 0 for C 2016-09-17 - changed order and so some
-  names, but not total number of results.
+  * Rewrite search - changed order and so some names, but not total
+    number of results.
+
+  * Replace trailing 0 with padding for group C - changed order and so
+    some names, but not total number of results.
+
+  * Halved number of group C patterns! - was not accounting for
+    reversed pattern plus negation.
