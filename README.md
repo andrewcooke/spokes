@@ -300,7 +300,12 @@ a [separate page](group-c.md).
 | 2B           | 2 Cross      |
 | 3B           | 3 Cross      |
 | 2,2B         | 2 Leading 2 Trailing |
+| 3B1          | Crow's Foot  |
 | 3,3,3B       | 3 Leading 3 Trailing |
+
+(Looking at images on the 'net, it might be better to say that Crow's
+Foot is a whole family of patterns with a certain style - more could
+be added above).
 
 ## Notes
 
