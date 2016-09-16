@@ -26,7 +26,7 @@
 // inside the OFFSET_BITS, where -0 is UNUSED_OFFSET (for extra
 // confusion, but simplified code, the value -1 in the signed
 // type used to represent offsets is used to initialise offsets
-// before search - initial incrementation move the value to 0).
+// before search - initial incrementation moves the value to 0).
 
 // the "new" search, for any particular length of pattern,
 // generates offsets that vary most rapidly in the highest index.

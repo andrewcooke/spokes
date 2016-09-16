@@ -1,4 +1,4 @@
-\
+
 # A Catalogue Of Spoke Patterns
 
 This is a [complete](#complete) catalogue of [valid](#validity) spoke
