@@ -59,4 +59,4 @@ search
 plot
 table.html
 *.html
-#*
+\#*
