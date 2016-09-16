@@ -548,6 +548,7 @@ group C results are already, I've lost the motivation...
 
 ### History
 
-* First complete version 2016-09-16
+* First complete version 2016-09-16.
 
-* Rewrite search 2016-09-17
+* Rewrite search 2016-09-17 - changed order and so some names, but not
+  total number of results.
