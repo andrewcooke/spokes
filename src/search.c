@@ -47,7 +47,8 @@
 
 
 // these can be changed, but going much deeper requires too much
-// memory for the sieve.
+// memory for the sieve (length 10 requires 128MB and gives 10387
+// patterns; length 12 requires 8GB and gives 72532 patterns).
 #define OFFSET_BITS 3
 #define MAX_LENGTH 6
 
@@ -461,7 +462,7 @@ int main(int argc, char** argv) {
     } else {
 
         luinfo(dbg, "Maximum spoke offset %d; Maximum pattern length %d", MAX_OFFSET, MAX_LENGTH);
-        luinfo(dbg, "Sieve size %dkB (%d entries)", SIEVE_LEN_BYTES / 1024, SIEVE_LEN);
+        luinfo(dbg, "Sieve size %ldkB (%ld entries)", SIEVE_LEN_BYTES / 1024, SIEVE_LEN);
         LU_ALLOC(dbg, sieve, SIEVE_LEN)
         LU_ASSERT(!lufle_exists(dbg, PATTERN_FILE), LU_ERR_IO, dbg, "Output file %s already exists", PATTERN_FILE)
         lufle_open(dbg, PATTERN_FILE, "w", &out);
