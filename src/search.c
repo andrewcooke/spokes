@@ -90,9 +90,9 @@ FILE *out = NULL;
 
 // more derived sizes
 #define SIEVE_WIDTH (8 * sizeof(*sieve))
-#define SIEVE_LEN_BITS (1L << (PATTERN_BITS - 1))
+#define SIEVE_LEN_BITS (1L << PATTERN_BITS)
 #define SIEVE_LEN ((SIEVE_LEN_BITS + (SIEVE_WIDTH - 1)) / SIEVE_WIDTH)
-#define SIEVE_LEN_BYTES (SIEVE_LEN * 8)
+#define SIEVE_LEN_BYTES (SIEVE_LEN_BITS / 8)
 
 #define SIEVE_INDEX(n) (n / SIEVE_WIDTH)
 #define SIEVE_SHIFT(n) (n - SIEVE_WIDTH * SIEVE_INDEX(n))
@@ -114,12 +114,12 @@ FILE *out = NULL;
 //    return s;
 //}
 //
-//void set_sieve(int n) {
-//    int index = SIEVE_INDEX(n);
-//    int shift = SIEVE_SHIFT(n);
-//    SET_SIEVE(n);
-//    ludebug(dbg, "Pattern %d -> sieve set at %d/%d", n, index, shift);
-//}
+void set_sieve(int n) {
+    int index = SIEVE_INDEX(n);
+    int shift = SIEVE_SHIFT(n);
+    SET_SIEVE(n);
+    ludebug(dbg, "Pattern %d -> sieve set at %d/%d", n, index, shift);
+}
 //
 //int rim_index(OFFSET_T offset, int index, int length) {
 //    int sign = offset & OFFSET_SIGN;
@@ -188,9 +188,9 @@ int check_lacing(PATTERN_T pattern, int length) {
 void set_sieve_all_rotn(PATTERN_T pattern, int length) {
     PATTERN_T left_mask = ((1L << (length * OFFSET_BITS)) - 1) ^ PATTERN_RIGHT_MASK;
     int right_rotation = (length - 1) * OFFSET_BITS;
-    for (int i = 0; i < MAX_LENGTH; ++i) {
+    for (int i = 0; i < length; ++i) {
         ludebug(dbg, "Setting %x, length %d", pattern, length);
-        SET_SIEVE(pattern);
+        set_sieve(pattern);
         pattern = ((pattern & left_mask) >> LEFT_ROTATION) | ((pattern & PATTERN_RIGHT_MASK) << right_rotation);
     }
 }
@@ -398,6 +398,12 @@ int candidate_c(OFFSET_T *offsets, int length) {
     int count = 0;
     PATTERN_T pattern = 0;
 
+    // remove trailing 0
+//    while (!offsets[0]) {
+//        offsets++;
+//        length--;
+//    }
+
     for (int i = 0; i < length; ++i) {pattern <<= OFFSET_BITS; pattern |= offsets[length - i - 1];}
 
     ludebug(dbg, "Candidate C length %d offsets %d %d %d %d %d %d -> %x", length,
@@ -491,7 +497,7 @@ int main(int argc, char** argv) {
 
     LU_STATUS
 
-    lulog_mkstderr(&dbg, lulog_level_debug);
+    lulog_mkstdout(&dbg, lulog_level_debug);
 
     if (argc != 1) {
         usage(argv[0]);
