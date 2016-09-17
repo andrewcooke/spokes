@@ -349,9 +349,6 @@ int candidate_c(OFFSET_T *offsets, int length) {
     int count = 0;
     PATTERN_T pattern1 = 0, pattern2 = 0;
 
-    // remove trailing 0
-    while (!offsets[length-1]) length--;
-
     for (int i = 0; i < length; ++i) {pattern1 <<= OFFSET_BITS; pattern1 |= offsets[i];}
     // negate and reverse to give second equivalent pattern
     // (does not apply to A/B because symmetric)
@@ -382,20 +379,9 @@ int candidate_c(OFFSET_T *offsets, int length) {
     } else if (offsets[0] & OFFSET_SIGN) {
         ludebug(dbg, "Skipping negative leading offset");
     } else {
-        for (int i = 0; i < MAX_LENGTH - length + 1; ++i) {
-            PATTERN_T padded = pattern1 << (i * OFFSET_BITS);
-            if (!GET_SIEVE(padded) && check_lacing(padded, length + i)) {
-                write_pattern(offsets, length, 'C', i, length + i);
-                count++;
-                set_sieve_all(padded, length + i);
-            }
-        }
-        for (int i = 0; i < MAX_LENGTH - length + 1; ++i) {
-            PATTERN_T padded = pattern2 << (i * OFFSET_BITS);
-            if (!GET_SIEVE(padded) && check_lacing(padded, length + i)) {
-                set_sieve_all(padded, length + i);
-            }
-        }
+        write_pattern(offsets, length, 'C', 0, length);
+        set_sieve_all(pattern1, length);
+        set_sieve_all(pattern2, length);
     }
 
     return count;

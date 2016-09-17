@@ -335,7 +335,7 @@ So 2,0A1 consists of
 
 * a single "extra" radial spoke (the trailing "1"),
 
-and so is better known as the Extended (or Adapated) Crow's Foot.
+and so is better known as the Extended (or Adapted) Crow's Foot.
 
 To write this software and organise the results into the catalogue
 above I have had to invent some terms.  My apologies if these are
@@ -395,8 +395,7 @@ three groups:
   simply 3B.
 
 * **C**: Everything else.  In other words, patterns that are not
-  symmetric as described above (but see [radial
-  padding](#radial-padding) below).
+  symmetric as described above.
 
   I write these patterns out completely.  For example 2,2,-1,-3C has
   spokes of offset 2, 2, -1 and -3 (ie the 1 and 3 are in the opposite
@@ -404,20 +403,26 @@ three groups:
 
 #### Radial Padding
 
-When you have a pattern that defines a "slice of pie" you can usually
-make a new pattern by adding another radial spoke to one side.
+When you have a symmetric pattern (groups A and B)that defines a
+"slice of pie" you can often make a new pattern by adding another
+radial spoke to one side.
 
-These patterns aren't very interesting, but can sometimes be useful.
+Patterns like this, with "extra" radial spokes, do not have the same
+symmetry as the original, but they are closely related and they "look
+symmetric".  Because of this, it is useful for them to be grouped with
+the "parent" pattern.
+
 For example, the Extended Crow's Foot pattern has an extra radial
 spoke, making its length 4 (ordinary Crow's Foot has 3 spokes in a
 "slice of pie").
 
-Instead of writing these patterns out as type C, I add the number of
-extra radial spokes after the pattern letter.  So Extended Crow's Foot
-is written as 2,0A1 (ordinary Crow's Foot is 2,0A).
+So I name these patterns by adding the number of radial spokes *after*
+the group letter.  For example, ordinary Crow's Foot is 2,0A and
+Extended Crow's Foot, with one extra radial spoke, is 2,0A1.
 
-For consistency, C patterns with trailing zeroes are also written in
-this way.
+Group C patterns are not treated in this way because the "parent"
+pattern has no symmetry anyway - they are the extra "messy" patterns
+without interesting structure.
 
 #### Preferred Names
 
@@ -429,19 +434,22 @@ To avoid duplication I use the following rules:
 
 * Always prefer group A over B, and B over C.
 
-* Omit [radial padding](#radial-padding) of zero.
+* Don't write the [radial padding](#radial-padding) if it's zero (so
+  write 3B, not 3B0).
 
-* Except for the 0A Radial pattern, omit leading and trailing radial
-  (0 offset) spokes (except those added with [radial
-  padding](#radial-padding)).
+* Except for the 0A Radial pattern, omit leading radial (0 offset)
+  spokes.
+
+* For groups A and B, replace trailing radial spokes with [radial
+  padding](#radial-padding).
 
 * Always start with a positive offset (any pattern can be "reversed"
   by changing the sign of all offsets - this is equivalent to lacing
   the pattern anti-clockwise instead of clockwise).
 
-* The above may still not exclude all duplications.  So I also check
-  for rotations of C patterns and discard anything that can be
-  expressed as an "earlier" name<sup>[1](#footnote-1)</sup>.
+* The above still does not exclude all duplications.  So I also check
+  for rotations and reflections of patterns and discard anything that
+  can be expressed as an "earlier" name<sup>[1](#footnote-1)</sup>.
 
 ### Validity
 
@@ -473,8 +481,8 @@ of length 3 (like Crow's Foot) can be used with 36 hole rims, and a
 pattern of length 2 (like 3 Cross) can be used with pretty much any
 rim as long as the hub can accommodate the spoke angles.
 
-The illustrations typically show 32 hole rims, unless that is
-incompatible with a particular pattern.
+The illustrations show 20, 32 and 36 hole rims, depending on the
+length of the particular pattern.
 
 ### Safety And Practicality
 
@@ -553,7 +561,7 @@ group C results are already, I've lost the motivation...
 
 ### History
 
-* 2016-09-16 - First complete version
+* 2016-09-16 - First complete version.
 
 * 2016-09-17
 
@@ -567,3 +575,5 @@ group C results are already, I've lost the motivation...
     reversed pattern plus negation.
 
   * Rewrite offset/pattern interpretation so ordering back to lexical.
+
+* 2016-09-18 - Remove padding for group C.
