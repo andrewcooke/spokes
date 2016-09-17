@@ -576,4 +576,8 @@ group C results are already, I've lost the motivation...
 
   * Rewrite offset/pattern interpretation so ordering back to lexical.
 
-* 2016-09-18 - Remove padding for group C.
+* 2016-09-18
+
+  * Remove padding for group C.
+
+  * Align spokes "behind" so that drawings are more realistic.
