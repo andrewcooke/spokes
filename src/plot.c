@@ -10,164 +10,10 @@
 #include "lu/files.h"
 #include "lu/dynamic_memory.h"
 
+#include "lib.h"
+
 
 lulog *dbg = NULL;
-
-int unpack_generic(const char *pattern, int **offsets, int *length, const char stop, int *padding) {
-
-    LU_STATUS
-
-    const char *p = pattern;
-    int sign = 1;
-
-    while (*p != stop) {
-        if (*p == ',') sign = 1;
-        else if (*p == '-') sign = -sign;
-        else {
-            int offset = *p - '0';
-            if (!(*offsets = realloc(*offsets, (1 + *length) * sizeof(**offsets)))) return LU_ERR_MEM;
-            (*offsets)[*length] = sign * offset;
-            (*length)++;
-            sign = 1;
-        }
-        p++;
-    }
-    p++;   // drop stop character
-    if (*p) {
-        *padding = *p - '0';
-    } else {
-        *padding = 0;
-    }
-
-    LU_NO_CLEANUP
-}
-
-int apply_padding(int **offsets, int *length, int padding) {
-
-    LU_STATUS
-
-    if (padding) {
-        if (!(*offsets = realloc(*offsets, (padding + *length) * sizeof(**offsets)))) return LU_ERR_MEM;
-        for (int i = 0; i < padding; ++i) (*offsets)[*length + i] = 0;
-        *length = padding + *length;
-    }
-
-    LU_NO_CLEANUP
-}
-
-int unpack_c(const char *pattern, int **offsets, int *length) {
-
-    LU_STATUS
-    int padding;
-
-    LU_CHECK(unpack_generic(pattern, offsets, length, 'C', &padding))
-    LU_CHECK(apply_padding(offsets, length, padding))
-
-    LU_NO_CLEANUP
-}
-
-int unpack_b(const char *pattern, int **offsets, int *length) {
-
-    LU_STATUS
-    int padding;
-
-    LU_CHECK(unpack_generic(pattern, offsets, length, 'B', &padding))
-
-    if (!(*offsets = realloc(*offsets, (2 * *length) * sizeof(**offsets)))) return LU_ERR_MEM;
-    for (int i = 0; i < *length; ++i) (*offsets)[*length + i] = -(*offsets)[*length - i - 1];
-    *length = 2 * *length;
-
-    LU_CHECK(apply_padding(offsets, length, padding))
-
-    LU_NO_CLEANUP
-}
-
-int unpack_a(const char *pattern, int **offsets, int *length) {
-
-    LU_STATUS
-    int padding;
-
-    LU_CHECK(unpack_generic(pattern, offsets, length, 'A', &padding))
-
-    if ((*offsets)[*length-1]) luwarn(dbg, "Central offset for group A is non-zero");
-    if (!(*offsets = realloc(*offsets, (2 * *length - 1) * sizeof(**offsets)))) return LU_ERR_MEM;
-    for (int i = 1; i < *length; ++i) (*offsets)[*length + i - 1] = -(*offsets)[*length - i - 1];
-    *length = 2 * *length - 1;
-
-    LU_CHECK(apply_padding(offsets, length, padding))
-
-    LU_NO_CLEANUP
-}
-
-int unpack(const char *pattern, int **offsets, int *length, int *nx, int *ny) {
-
-    LU_STATUS
-
-    if (strchr(pattern, 'A')) {
-        LU_CHECK(unpack_a(pattern, offsets, length));
-        *nx = *ny = 200;
-    } else if (strchr(pattern, 'B')) {
-        LU_CHECK(unpack_b(pattern, offsets, length));
-        *nx = *ny = 200;
-    } else if (strchr(pattern, 'C')) {
-        LU_CHECK(unpack_c(pattern, offsets, length));
-        *nx = *ny = 100;
-    } else {
-        luerror(dbg, "Did not find group type (A, B, C) in %s", pattern);
-        status = LU_ERR_ARG;
-    }
-
-    LU_NO_CLEANUP
-}
-
-int dump_pattern(int *offsets, int length) {
-
-    LU_STATUS
-    char *buffer = NULL, *p;
-
-    LU_ALLOC(dbg, buffer, length * 3 + 4)
-    p = buffer;
-    for (int i = 0; i < length; ++i) {
-        if (i) p += sprintf(p, ",");
-        p += sprintf(p, "%d", offsets[i]);
-    }
-    *p = '\0';
-
-    luinfo(dbg, "Pattern: %s (length %d)", buffer, length);
-
-LU_CLEANUP
-    free(buffer);
-    LU_RETURN
-}
-
-int rim_size(int length, int *holes) {
-    LU_STATUS
-    switch(length) {
-    case 1:
-    case 2:
-    case 4:
-    case 8:
-        *holes = 32;
-        break;
-    case 3:
-    case 6:
-    case 9:
-        *holes = 36;
-        break;
-    case 7:
-        *holes = 28;
-        break;
-    case 5:
-    case 10:
-        *holes = 20;
-        break;
-    default:
-        luerror(dbg, "Cannot infer number of holes for a pattern of length %d", length);
-        status = LU_ERR_ARG;
-    }
-    if (!status) luinfo(dbg, "Will plot a rim with %d holes", *holes);
-    LU_RETURN
-}
 
 void draw_circle(cairo_t *cr, float r) {
     cairo_move_to(cr, r, 0);
@@ -190,7 +36,7 @@ void draw_pattern(cairo_t *cr, int *offsets, int length, float r_hub, float r_ri
     }
 }
 
-int draw(int *offsets, int length, int holes, int nx, int ny, const char *path) {
+int draw(int *offsets, int length, int holes, int nx, int ny, int align, const char *path) {
 
     LU_STATUS;
     float r_hub = 0.15, r_rim = 0.9, wheel_width = 0.03, wheel_grey = 0.5;
@@ -214,7 +60,7 @@ int draw(int *offsets, int length, int holes, int nx, int ny, const char *path) 
     cairo_set_line_width(cr, spoke_width);
     cairo_set_source_rgb(cr, spoke_grey, spoke_grey, spoke_grey);
     for (int i = 0; i < holes / (2 * length); ++i) {
-        draw_pattern(cr, offsets, length, r_hub, r_rim, holes, 2 * i * length - 1, -1);
+        draw_pattern(cr, offsets, length, r_hub, r_rim, holes, 2 * i * length - 1 - 2 * align, -1);
     }
     cairo_set_source_rgb(cr, 0, 0, 0);
     for (int i = 1; i < holes / (2 * length); ++i) {
@@ -231,39 +77,18 @@ LU_CLEANUP
     LU_RETURN
 }
 
-int make_path(const char *pattern, char **path) {
-
-    LU_STATUS
-    const char *p1;
-    char *p2;
-
-    LU_ALLOC(dbg, *path, strlen(pattern) + 5)
-    p1 = pattern; p2 = *path;
-    while(*p1) {
-        if (*p1 != ',') *(p2++) = *p1;
-        p1++;
-    }
-    p2 += sprintf(p2, ".png");
-    *p2 = '\0';
-
-    luinfo(dbg, "File path: %s", *path);
-
-LU_CLEANUP
-    LU_RETURN
-}
-
 int plot(const char *pattern) {
 
     LU_STATUS;
-    int *offsets = NULL, length = 0, holes = 0, nx = 0, ny = 0;
+    int *offsets = NULL, length = 0, holes = 0, nx = 0, ny = 0, padding;
     char *path = NULL;
 
     luinfo(dbg, "Pattern '%s'", pattern);
-    LU_CHECK(unpack(pattern, &offsets, &length, &nx, &ny));
-    LU_CHECK(dump_pattern(offsets, length));
-    LU_CHECK(rim_size(length, &holes));
-    LU_CHECK(make_path(pattern, &path));
-    LU_CHECK(draw(offsets, length, holes, nx, ny, path));
+    LU_CHECK(unpack(dbg, pattern, &offsets, &length, &nx, &ny, &padding));
+    LU_CHECK(dump_pattern(dbg, offsets, length));
+    LU_CHECK(rim_size(dbg, length, &holes));
+    LU_CHECK(make_path(dbg, pattern, &path));
+    LU_CHECK(draw(offsets, length, holes, nx, ny, padding, path));
 
 LU_CLEANUP
     free(path);
@@ -282,7 +107,6 @@ void usage(const char *progname) {
 int main(int argc, char** argv) {
 
     LU_STATUS
-
     lulog_mkstderr(&dbg, lulog_level_debug);
     if (argc != 2 || !strcmp("-h", argv[1])) {
         usage(argv[0]);

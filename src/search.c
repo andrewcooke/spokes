@@ -440,7 +440,6 @@ void usage(const char *progname) {
 int main(int argc, char** argv) {
 
     LU_STATUS
-
     lulog_mkstdout(&dbg, lulog_level_debug);
 
     if (argc != 1) {
