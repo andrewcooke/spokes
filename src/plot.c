@@ -99,22 +99,19 @@ int unpack_a(const char *pattern, int **offsets, int *length) {
     LU_NO_CLEANUP
 }
 
-int unpack(const char *pattern, int **offsets, int *length, int *nx, int *ny, int *align) {
+int unpack(const char *pattern, int **offsets, int *length, int *nx, int *ny) {
 
     LU_STATUS
 
     if (strchr(pattern, 'A')) {
         LU_CHECK(unpack_a(pattern, offsets, length));
         *nx = *ny = 200;
-        *align = *length / 2;
     } else if (strchr(pattern, 'B')) {
         LU_CHECK(unpack_b(pattern, offsets, length));
         *nx = *ny = 200;
-        *align = *length / 2;
     } else if (strchr(pattern, 'C')) {
         LU_CHECK(unpack_c(pattern, offsets, length));
         *nx = *ny = 100;
-        *align = 0;
     } else {
         luerror(dbg, "Did not find group type (A, B, C) in %s", pattern);
         status = LU_ERR_ARG;
@@ -193,7 +190,7 @@ void draw_pattern(cairo_t *cr, int *offsets, int length, float r_hub, float r_ri
     }
 }
 
-int draw(int *offsets, int length, int holes, int nx, int ny, int align, const char *path) {
+int draw(int *offsets, int length, int holes, int nx, int ny, const char *path) {
 
     LU_STATUS;
     float r_hub = 0.15, r_rim = 0.9, wheel_width = 0.03, wheel_grey = 0.5;
@@ -217,7 +214,7 @@ int draw(int *offsets, int length, int holes, int nx, int ny, int align, const c
     cairo_set_line_width(cr, spoke_width);
     cairo_set_source_rgb(cr, spoke_grey, spoke_grey, spoke_grey);
     for (int i = 0; i < holes / (2 * length); ++i) {
-        draw_pattern(cr, offsets, length, r_hub, r_rim, holes, 2 * i * length + 1 - 2 * align, -1);
+        draw_pattern(cr, offsets, length, r_hub, r_rim, holes, 2 * i * length - 1, -1);
     }
     cairo_set_source_rgb(cr, 0, 0, 0);
     for (int i = 1; i < holes / (2 * length); ++i) {
@@ -258,15 +255,15 @@ LU_CLEANUP
 int plot(const char *pattern) {
 
     LU_STATUS;
-    int *offsets = NULL, length = 0, holes = 0, nx = 0, ny = 0, align = 0;
+    int *offsets = NULL, length = 0, holes = 0, nx = 0, ny = 0;
     char *path = NULL;
 
     luinfo(dbg, "Pattern '%s'", pattern);
-    LU_CHECK(unpack(pattern, &offsets, &length, &nx, &ny, &align));
+    LU_CHECK(unpack(pattern, &offsets, &length, &nx, &ny));
     LU_CHECK(dump_pattern(offsets, length));
     LU_CHECK(rim_size(length, &holes));
     LU_CHECK(make_path(pattern, &path));
-    LU_CHECK(draw(offsets, length, holes, nx, ny, align, path));
+    LU_CHECK(draw(offsets, length, holes, nx, ny, path));
 
 LU_CLEANUP
     free(path);

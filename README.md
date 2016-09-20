@@ -581,3 +581,5 @@ group C results are already, I've lost the motivation...
   * Remove padding for group C.
 
   * Align spokes "behind" so that drawings are more realistic.
+
+* 2016-09-20 - remove alignment (makes no sense in retrospect).
