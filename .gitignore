@@ -57,6 +57,7 @@ libtool
 *.log
 search
 plot
+stress
 table.html
 *.html
 \#*
