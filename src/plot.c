@@ -77,17 +77,33 @@ LU_CLEANUP
     LU_RETURN
 }
 
+int plot_size(char type, int *nx, int *ny) {
+    switch(type) {
+    case 'A':
+    case 'B':
+        *nx = *ny = 200;
+        return LU_OK;
+    case 'C':
+        *nx = *ny = 100;
+        return LU_OK;
+    default:
+        luerror(dbg, "Unexpected type %c", type);
+        return LU_ERR;
+    }
+}
+
 int plot(const char *pattern) {
 
     LU_STATUS;
     int *offsets = NULL, length = 0, holes = 0, nx = 0, ny = 0, padding;
-    char *path = NULL;
+    char *path = NULL, type;
 
     luinfo(dbg, "Pattern '%s'", pattern);
-    LU_CHECK(unpack(dbg, pattern, &offsets, &length, &nx, &ny, &padding));
+    LU_CHECK(unpack(dbg, pattern, &offsets, &length, &type, &padding));
     LU_CHECK(dump_pattern(dbg, offsets, length));
     LU_CHECK(rim_size(dbg, length, &holes));
     LU_CHECK(make_path(dbg, pattern, &path));
+    LU_CHECK(plot_size(type, &nx, &ny));
     LU_CHECK(draw(offsets, length, holes, nx, ny, padding, path));
 
 LU_CLEANUP
