@@ -582,4 +582,6 @@ group C results are already, I've lost the motivation...
 
   * Align spokes "behind" so that drawings are more realistic.
 
-* 2016-09-20 - change alignment to padding.
+* 2016-09-20 - Change alignment to padding.
+
+* 2016-09-21 - Make wheel geometry in plots more lifelike (smaller hubs).

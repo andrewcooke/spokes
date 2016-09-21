@@ -15,12 +15,6 @@
 
 lulog *dbg = NULL;
 
-void draw_circle(cairo_t *cr, float r) {
-    cairo_move_to(cr, r, 0);
-    cairo_arc(cr, 0, 0, r, 0, 2*M_PI);
-    cairo_stroke(cr);
-}
-
 void draw_spoke(cairo_t *cr, int hub, int offset, float r_hub, float r_rim, int holes) {
     float fudge = -M_PI / 2;  // rotate so red is in a nice place
     float t_hub = 2 * M_PI * hub / holes + fudge;
@@ -39,7 +33,7 @@ void draw_pattern(cairo_t *cr, int *offsets, int length, float r_hub, float r_ri
 int draw(int *offsets, int length, int holes, int nx, int ny, int align, const char *path) {
 
     LU_STATUS;
-    float r_hub = 0.15, r_rim = 0.9, wheel_width = 0.03, wheel_grey = 0.5;
+    float r_hub = 0.085, r_rim = 0.9, wheel_width = 0.03, wheel_grey = 0.5;
     float spoke_width = 0.015, red = 0.5, spoke_grey = 0.7;
 
     cairo_surface_t *surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, nx, ny);

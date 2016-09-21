@@ -12,6 +12,18 @@
 #include "lib.h"
 
 
+void draw_circle(cairo_t *cr, float r) {
+    cairo_move_to(cr, r, 0);
+    cairo_arc(cr, 0, 0, r, 0, 2*M_PI);
+    cairo_stroke(cr);
+}
+
+void draw_line(cairo_t *cr, float x0, float y0, float x1, float y1) {
+    cairo_move_to(cr, x0, y0);
+    cairo_line_to(cr, x1, y1);
+    cairo_stroke(cr);
+}
+
 static int unpack_generic(const char *pattern, int **offsets, int *length, const char stop, int *padding) {
 
     LU_STATUS
