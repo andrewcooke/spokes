@@ -105,14 +105,17 @@ void plot_wheel(wheel *wheel, const char *path) {
 
 }
 
-// inwards from rim to hub
-xy spoke_direction(wheel *wheel, int spoke) {
-    xy hub = xy_on_circle(wheel->r_hub, spoke, wheel->n_holes);
-    xy rim = wheel->rim[spoke];
-    return sub(hub, rim);
+double angle_to_rim(wheel *wheel, int spoke) {
+    xy hub = wheel->hub[spoke];
+    xy rim = wheel->rim[wheel->hub_to_rim[spoke]];
+    // angle of spoke relative to horizontal
+    double theta = atan2(rim.y - hub.y, rim.x - hub.x);
+    // angle of radius to horizontal
+    double psi = atan2(rim.y, rim.x);
+    // angle of spoke relative to tangent, where 0 = along rim anticlock,
+    // 90 = towards axle, 180 = along rim clock (but in radians...)
+    return M_PI / 2 - psi + theta;
 }
-
-
 
 int lace(wheel *wheel) {
 
@@ -121,7 +124,6 @@ int lace(wheel *wheel) {
 
     LU_ALLOC(dbg, tension, wheel->n_holes);
 
-    // first, place spokes on geometric circle (no rim compression)
     for (int i = 0; i < wheel->n_holes; i += 2) {
         int offset = wheel->offset[(i / 2) % wheel->n_offsets];
         int rim_index = (i + 2 * offset + wheel->n_holes) % wheel->n_holes;
@@ -140,10 +142,11 @@ int lace(wheel *wheel) {
         wheel->rim[rim_index] = xy_on_circle(wheel->r_rim, rim_index, wheel->n_holes);
     }
 
-    // set lengths so that all have desired tension
+    // set lengths so that all have desired radial tension
     for (int i = 0; i < wheel->n_holes; ++i) {
         double l = length(sub(wheel->hub[i], wheel->rim[wheel->hub_to_rim[i]]));
-        wheel->l_spoke[i] = l - wheel->tension / wheel->e_spoke;
+        double theta = angle_to_rim(wheel, i);
+        wheel->l_spoke[i] = l - wheel->tension / (sin(theta) * wheel->e_spoke);
     }
 
 LU_CLEANUP
