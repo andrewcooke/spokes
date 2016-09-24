@@ -24,7 +24,7 @@ void draw_line(cairo_t *cr, float x0, float y0, float x1, float y1) {
     cairo_stroke(cr);
 }
 
-static int unpack_generic(const char *pattern, int **offsets, int *length, const char stop, int *padding) {
+static int unpack_generic(lulog *dbg, const char *pattern, int **offsets, int *length, const char stop, int *padding) {
 
     LU_STATUS
 
@@ -34,12 +34,16 @@ static int unpack_generic(const char *pattern, int **offsets, int *length, const
     while (*p != stop) {
         if (*p == ',') sign = 1;
         else if (*p == '-') sign = -sign;
-        else {
+        else if (*p >= '0' && *p <= '9'){
             int offset = *p - '0';
             if (!(*offsets = realloc(*offsets, (1 + *length) * sizeof(**offsets)))) return LU_ERR_MEM;
             (*offsets)[*length] = sign * offset;
             (*length)++;
             sign = 1;
+        } else {
+            luerror(dbg, "Bad character '%c'", *p);
+            status = LU_ERR;
+            goto exit;
         }
         p++;
     }
@@ -66,22 +70,22 @@ static int apply_padding(int **offsets, int *length, int padding) {
     LU_NO_CLEANUP
 }
 
-static int unpack_c(const char *pattern, int **offsets, int *length) {
+static int unpack_c(lulog *dbg, const char *pattern, int **offsets, int *length) {
 
     LU_STATUS
     int padding;
 
-    LU_CHECK(unpack_generic(pattern, offsets, length, 'C', &padding))
+    LU_CHECK(unpack_generic(dbg, pattern, offsets, length, 'C', &padding))
     LU_CHECK(apply_padding(offsets, length, padding))
 
     LU_NO_CLEANUP
 }
 
-static int unpack_b(const char *pattern, int **offsets, int *length, int *padding) {
+static int unpack_b(lulog *dbg, const char *pattern, int **offsets, int *length, int *padding) {
 
     LU_STATUS
 
-    LU_CHECK(unpack_generic(pattern, offsets, length, 'B', padding))
+    LU_CHECK(unpack_generic(dbg, pattern, offsets, length, 'B', padding))
 
     if (!(*offsets = realloc(*offsets, (2 * *length) * sizeof(**offsets)))) return LU_ERR_MEM;
     for (int i = 0; i < *length; ++i) (*offsets)[*length + i] = -(*offsets)[*length - i - 1];
@@ -96,7 +100,7 @@ static int unpack_a(lulog *dbg, const char *pattern, int **offsets, int *length,
 
     LU_STATUS
 
-    LU_CHECK(unpack_generic(pattern, offsets, length, 'A', padding))
+    LU_CHECK(unpack_generic(dbg, pattern, offsets, length, 'A', padding))
 
     if ((*offsets)[*length-1]) luwarn(dbg, "Central offset for group A is non-zero");
     if (!(*offsets = realloc(*offsets, (2 * *length - 1) * sizeof(**offsets)))) return LU_ERR_MEM;
@@ -116,10 +120,10 @@ int unpack(lulog *dbg, const char *pattern, int **offsets, int *length, char *ty
         LU_CHECK(unpack_a(dbg, pattern, offsets, length, padding));
         if (type) *type = 'A';
     } else if (strchr(pattern, 'B')) {
-        LU_CHECK(unpack_b(pattern, offsets, length, padding));
+        LU_CHECK(unpack_b(dbg, pattern, offsets, length, padding));
         if (type) *type = 'B';
     } else if (strchr(pattern, 'C')) {
-        LU_CHECK(unpack_c(pattern, offsets, length));
+        LU_CHECK(unpack_c(dbg, pattern, offsets, length));
         if (type) *type = 'C';
         *padding = 0;
     } else {

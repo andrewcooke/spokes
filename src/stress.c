@@ -26,23 +26,53 @@ typedef struct {
     int *offset;
     int align;        // extra offset of "other side"
     int n_holes;
-    xy *nipple;
     double r_hub;
-    double windup;    // angle of rotation of hub
     double r_rim;     // uncompressed
-    double *l_spoke;  // slack
+    xy *rim;          // vary
+    xy *hub;          // fixed
+    int *hub_to_rim;  // spoke from hub[n] to rim[hub_to_rim[n]] has length[n]
+    int *rim_to_hub;  // inverse of above
+    double *l_spoke;  // unloaded
+    double tension;   // target tension for spokes
     double e_rim;
     double e_spoke;
 } wheel;
 
 
+xy sub(xy a, xy b) {
+    xy c;
+    c.x = a.x - b.x;
+    c.y = a.y - b.y;
+    return c;
+}
+
+double length(xy xy) {
+    return sqrt(xy.x * xy.x + xy.y * xy.y);
+}
+
+xy scalar_mult(double k, xy a) {
+    xy c;
+    c.x = k * a.x;
+    c.y = k * a.y;
+    return c;
+}
+
+xy norm(xy a) {
+    return scalar_mult(1.0 / length(a), a);
+}
+
+
 // hole 0 at 12 o'clock
-xy hole_xy(double r, int hole, int n_holes, double delta) {
+xy xy_on_circle(double r, int hole, int n_holes) {
     xy xy;
-    double theta = delta + 2 * M_PI * hole / (float)n_holes;
+    double theta = 2 * M_PI * hole / (float)n_holes;
     xy.x = r * sin(theta);
     xy.y = r * cos(theta);
     return xy;
+}
+
+void draw_line_xy(cairo_t *cr, xy a, xy b) {
+    draw_line(cr, a.x, a.y, b.x, b.y);
 }
 
 void plot_wheel(wheel *wheel, const char *path) {
@@ -61,15 +91,13 @@ void plot_wheel(wheel *wheel, const char *path) {
 
     cairo_set_line_width(cr, line_width);
     cairo_set_source_rgb(cr, 0, 0, 0);
-    draw_circle(cr, wheel->r_hub);
-    draw_circle(cr, wheel->r_rim);
 
-    for (int i = 0; i < wheel->n_holes; ++i) {
-        xy hub = hole_xy(wheel->r_hub, i, wheel->n_holes, wheel->windup);
-        xy rim = wheel->nipple[i];
-        draw_line(cr, hub.x, hub.y, rim.x, rim.y);
+    for (int hub = 0; hub < wheel->n_holes; ++hub) {
+        int rim = wheel->hub_to_rim[hub];
+        draw_line_xy(cr, wheel->hub[hub], wheel->rim[rim]);
+        draw_line_xy(cr, wheel->hub[hub], wheel->hub[(hub+1) % wheel->n_holes]);
+        draw_line_xy(cr, wheel->rim[rim], wheel->rim[(rim+1) % wheel->n_holes]);
     }
-
 
     cairo_surface_write_to_png(surface, path);
     cairo_destroy(cr);
@@ -77,27 +105,50 @@ void plot_wheel(wheel *wheel, const char *path) {
 
 }
 
-void widths_for_tension(wheel *wheel) {
-
+// inwards from rim to hub
+xy spoke_direction(wheel *wheel, int spoke) {
+    xy hub = xy_on_circle(wheel->r_hub, spoke, wheel->n_holes);
+    xy rim = wheel->rim[spoke];
+    return sub(hub, rim);
 }
 
-void tension_for_circle(wheel *wheel) {
 
-}
 
-void lace(wheel *wheel) {
+int lace(wheel *wheel) {
+
+    LU_STATUS
+    double *tension = NULL;
+
+    LU_ALLOC(dbg, tension, wheel->n_holes);
+
+    // first, place spokes on geometric circle (no rim compression)
     for (int i = 0; i < wheel->n_holes; i += 2) {
         int offset = wheel->offset[(i / 2) % wheel->n_offsets];
-        wheel->nipple[i] = hole_xy(wheel->r_rim, i + 2 * offset, wheel->n_holes, 0);
+        int rim_index = (i + 2 * offset + wheel->n_holes) % wheel->n_holes;
+        wheel->hub_to_rim[i] = rim_index;
+        wheel->rim_to_hub[rim_index] = i;
+        wheel->hub[i] = xy_on_circle(wheel->r_hub, i, wheel->n_holes);
+        wheel->rim[rim_index] = xy_on_circle(wheel->r_rim, rim_index, wheel->n_holes);
     }
     for (int i = 0; i < wheel->n_holes; i += 2) {
         int offset = wheel->offset[(i / 2) % wheel->n_offsets];
-        wheel->nipple[(i + 2 * wheel->align + 1) % wheel->n_holes] = hole_xy(wheel->r_rim, i + 2 * (offset + wheel->align) + 1, wheel->n_holes, 0);
+        int hub_index = (i + 2 * wheel->align + 1 + wheel->n_holes) % wheel->n_holes;
+        int rim_index = (i + 2 * (offset + wheel->align) + 1 + wheel->n_holes) % wheel->n_holes;
+        wheel->hub_to_rim[hub_index] = rim_index;
+        wheel->rim_to_hub[rim_index] = hub_index;
+        wheel->hub[hub_index] = xy_on_circle(wheel->r_hub, hub_index, wheel->n_holes);
+        wheel->rim[rim_index] = xy_on_circle(wheel->r_rim, rim_index, wheel->n_holes);
     }
-    for (int repeat = 0; repeat < 2; ++repeat) {
-        tension_for_circle(wheel);
-        widths_for_tension(wheel);
+
+    // set lengths so that all have desired tension
+    for (int i = 0; i < wheel->n_holes; ++i) {
+        double l = length(sub(wheel->hub[i], wheel->rim[wheel->hub_to_rim[i]]));
+        wheel->l_spoke[i] = l - wheel->tension / wheel->e_spoke;
     }
+
+LU_CLEANUP
+    free(tension);
+    LU_RETURN
 }
 
 int make_wheel(int *offsets, int length, int holes, int padding, char type, wheel **wheel) {
@@ -109,12 +160,15 @@ int make_wheel(int *offsets, int length, int holes, int padding, char type, whee
     for (int i = 0; i < length; ++i) (*wheel)->offset[i] = offsets[i];
     (*wheel)->align = padding;
     (*wheel)->n_holes = holes;
-    LU_ALLOC(dbg, (*wheel)->nipple, holes);
-    (*wheel)->r_hub = 25;
-    (*wheel)->windup = 0;
-    (*wheel)->r_rim = 280;
+    LU_ALLOC(dbg, (*wheel)->rim, holes);
+    LU_ALLOC(dbg, (*wheel)->hub, holes);
+    LU_ALLOC(dbg, (*wheel)->hub_to_rim, holes);
+    LU_ALLOC(dbg, (*wheel)->rim_to_hub, holes);
+    (*wheel)->r_hub = 25;  // mm
+    (*wheel)->r_rim = 280;  // mm
     LU_ALLOC(dbg, (*wheel)->l_spoke, holes);
-    (*wheel)->e_spoke = 1;
+    (*wheel)->tension = 1000;  // 100 kgf = 1000 N
+    (*wheel)->e_spoke = 200000 * 3;  // 200000 N/mm^2 for steel approx; 2mm diameter spoke
     (*wheel)->e_rim = 100 * (*wheel)->e_spoke;
     LU_NO_CLEANUP
 }
@@ -122,7 +176,10 @@ int make_wheel(int *offsets, int length, int holes, int padding, char type, whee
 void free_wheel(wheel *wheel) {
     if (wheel) {
         free(wheel->offset);
-        free(wheel->nipple);
+        free(wheel->rim);
+        free(wheel->hub);
+        free(wheel->hub_to_rim);
+        free(wheel->rim_to_hub);
         free(wheel->l_spoke);
         free(wheel);
     }
@@ -141,7 +198,8 @@ int stress(const char *pattern) {
     LU_CHECK(dump_pattern(dbg, offsets, length));
     LU_CHECK(rim_size(dbg, length, &holes));
     LU_CHECK(make_wheel(offsets, length, holes, padding, type, &wheel));
-    lace(wheel);
+    LU_CHECK(lace(wheel));
+//    LU_CHECK(true(wheel));
     LU_CHECK(make_path(dbg, pattern, &path));
     plot_wheel(wheel, path);
 
