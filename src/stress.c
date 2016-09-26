@@ -28,6 +28,7 @@ typedef struct {
     int n_holes;
     double r_hub;
     double r_rim;     // uncompressed
+    double l_chord;
     xy *rim;          // vary
     xy *hub;          // fixed
     int *hub_to_rim;  // spoke from hub[n] to rim[hub_to_rim[n]] has length[n]
@@ -38,6 +39,13 @@ typedef struct {
     double e_spoke;
 } wheel;
 
+
+xy add(xy a, xy b) {
+    xy c;
+    c.x = a.x + b.x;
+    c.y = a.y + b.y;
+    return c;
+}
 
 xy sub(xy a, xy b) {
     xy c;
@@ -105,9 +113,10 @@ void plot_wheel(wheel *wheel, const char *path) {
 
 }
 
-double angle_to_rim(wheel *wheel, int spoke) {
-    xy hub = wheel->hub[spoke];
-    xy rim = wheel->rim[wheel->hub_to_rim[spoke]];
+double angle_to_rim(wheel *wheel, int i_hub) {
+    int i_rim = wheel->hub_to_rim[i_hub];
+    xy hub = wheel->hub[i_hub];
+    xy rim = wheel->rim[i_rim];
     // angle of spoke relative to horizontal
     double theta = atan2(rim.y - hub.y, rim.x - hub.x);
     // angle of radius to horizontal
@@ -117,6 +126,81 @@ double angle_to_rim(wheel *wheel, int spoke) {
     return M_PI / 2 - psi + theta;
 }
 
+xy polar_scale(xy components, xy location, double radial, double tangential, double *acc_r, double *acc_t) {
+    xy n = norm(location);
+    double r = radial * (components.x * n.x + components.y * n.y);
+    double t = tangential * (components.x * n.y - components.x * n.x);
+    *acc_r = *acc_r + fabs(r);
+    *acc_t = *acc_t + fabs(t);
+    double theta = atan2(location.y, location.x);
+    xy c;
+    c.x = r * cos(theta) + t * sin(theta);
+    c.y = r * sin(theta) - t * cos(theta);
+    return c;
+}
+
+int relax(wheel *wheel, double damping) {
+
+    LU_STATUS
+    double acc_r = 0, acc_t = 0, acc_f = 0;
+
+    xy *forces = NULL;  // force at hole[index]
+    LU_ALLOC(dbg, forces, wheel->n_holes)
+
+    // accumulate total force
+
+    // force on hole i_rim from spoke at hub i_hub
+    for (int i_rim = 0; i_rim < wheel->n_holes; ++i_rim) {
+        int i_hub = wheel->rim_to_hub[i_rim];
+        xy hub = wheel->hub[i_hub];
+        xy rim = wheel->rim[i_rim];
+        xy spoke = sub(hub, rim);  // points inwards towards hub
+        double l = length(spoke);
+        // 1/l for strain, 1/l for normalization of spoke direction
+        // stretched here, so l - l_spoke
+        forces[i_rim] = scalar_mult((l - wheel->l_spoke[i_hub]) * wheel->e_spoke / (l * l), spoke);
+    }
+
+    // forces on hole i from rim chord to either side
+    // we are looking at the chord from i_after-1 (i_before) to i_after
+    xy before = wheel->rim[wheel->n_holes-1];
+    for (int i_after = 0; i_after < wheel->n_holes; ++i_after) {
+        xy after = wheel->rim[i_after];
+        xy chord = sub(after, before);  // points from i_before towards i_after
+        double l = length(chord);
+        // compressive here, so l_chord - l
+        xy force = scalar_mult((wheel->l_chord - l) * wheel->e_rim / (l * l), chord);  // points towards i_after
+        forces[i_after] = add(forces[i_after], force);
+        int i_before = (i_after-1+wheel->n_holes) % wheel->n_holes;
+        forces[i_before] = sub(forces[i_before], force);  // sub because pointing other way
+        before = after;
+    }
+
+    // apply force
+    for (int i_rim = 0; i_rim < wheel->n_holes; ++i_rim) {
+        acc_f += length(forces[i_rim]);
+        xy displacement = polar_scale(forces[i_rim], wheel->rim[i_rim],
+                damping * wheel->l_spoke[wheel->rim_to_hub[i_rim]] / wheel->e_spoke,
+                damping * wheel->l_chord / wheel->e_rim,
+                &acc_r, &acc_t);
+        wheel->rim[i_rim] = add(wheel->rim[i_rim], displacement);
+    }
+    ludebug(dbg, "Damping %5.3f; total r: %7.2emm, t: %7.2emm, f: %7.2eN", damping, acc_r, acc_t, acc_f);
+
+LU_CLEANUP
+    free(forces);
+    LU_RETURN
+}
+
+int true(wheel *wheel) {
+    LU_STATUS
+    int n = 100;
+    for (int i = 0; i < n; ++i) {
+        LU_CHECK(relax(wheel, pow(10, -1 + (i-n)/(n/3.0))))
+    }
+    LU_NO_CLEANUP
+}
+
 int lace(wheel *wheel) {
 
     LU_STATUS
@@ -124,29 +208,31 @@ int lace(wheel *wheel) {
 
     LU_ALLOC(dbg, tension, wheel->n_holes);
 
-    for (int i = 0; i < wheel->n_holes; i += 2) {
-        int offset = wheel->offset[(i / 2) % wheel->n_offsets];
-        int rim_index = (i + 2 * offset + wheel->n_holes) % wheel->n_holes;
-        wheel->hub_to_rim[i] = rim_index;
-        wheel->rim_to_hub[rim_index] = i;
-        wheel->hub[i] = xy_on_circle(wheel->r_hub, i, wheel->n_holes);
-        wheel->rim[rim_index] = xy_on_circle(wheel->r_rim, rim_index, wheel->n_holes);
+    for (int i_hub = 0; i_hub < wheel->n_holes; i_hub += 2) {
+        int offset = wheel->offset[(i_hub / 2) % wheel->n_offsets];
+        int i_rim = (i_hub + 2 * offset + wheel->n_holes) % wheel->n_holes;
+        wheel->hub_to_rim[i_hub] = i_rim;
+        wheel->rim_to_hub[i_rim] = i_hub;
+        wheel->hub[i_hub] = xy_on_circle(wheel->r_hub, i_hub, wheel->n_holes);
+        wheel->rim[i_rim] = xy_on_circle(wheel->r_rim, i_rim, wheel->n_holes);
     }
     for (int i = 0; i < wheel->n_holes; i += 2) {
         int offset = wheel->offset[(i / 2) % wheel->n_offsets];
-        int hub_index = (i + 2 * wheel->align + 1 + wheel->n_holes) % wheel->n_holes;
-        int rim_index = (i + 2 * (offset + wheel->align) + 1 + wheel->n_holes) % wheel->n_holes;
-        wheel->hub_to_rim[hub_index] = rim_index;
-        wheel->rim_to_hub[rim_index] = hub_index;
-        wheel->hub[hub_index] = xy_on_circle(wheel->r_hub, hub_index, wheel->n_holes);
-        wheel->rim[rim_index] = xy_on_circle(wheel->r_rim, rim_index, wheel->n_holes);
+        int i_hub = (i + 2 * wheel->align + 1 + wheel->n_holes) % wheel->n_holes;
+        int i_rim = (i + 2 * (offset + wheel->align) + 1 + wheel->n_holes) % wheel->n_holes;
+        wheel->hub_to_rim[i_hub] = i_rim;
+        wheel->rim_to_hub[i_rim] = i_hub;
+        wheel->hub[i_hub] = xy_on_circle(wheel->r_hub, i_hub, wheel->n_holes);
+        wheel->rim[i_rim] = xy_on_circle(wheel->r_rim, i_rim, wheel->n_holes);
     }
 
     // set lengths so that all have desired radial tension
-    for (int i = 0; i < wheel->n_holes; ++i) {
-        double l = length(sub(wheel->hub[i], wheel->rim[wheel->hub_to_rim[i]]));
-        double theta = angle_to_rim(wheel, i);
-        wheel->l_spoke[i] = l - wheel->tension / (sin(theta) * wheel->e_spoke);
+    for (int i_hub = 0; i_hub < wheel->n_holes; ++i_hub) {
+        int i_rim = wheel->hub_to_rim[i_hub];
+        double l = length(sub(wheel->hub[i_hub], wheel->rim[i_rim]));
+        double theta = angle_to_rim(wheel, i_hub);
+        double strain = wheel->tension / (sin(theta) * wheel->e_spoke);
+        wheel->l_spoke[i_hub] = l * (1 - strain);
     }
 
 LU_CLEANUP
@@ -169,6 +255,7 @@ int make_wheel(int *offsets, int length, int holes, int padding, char type, whee
     LU_ALLOC(dbg, (*wheel)->rim_to_hub, holes);
     (*wheel)->r_hub = 25;  // mm
     (*wheel)->r_rim = 280;  // mm
+    (*wheel)->l_chord = 2 * (*wheel)->r_rim * sin(M_PI / (*wheel)->n_holes);
     LU_ALLOC(dbg, (*wheel)->l_spoke, holes);
     (*wheel)->tension = 1000;  // 100 kgf = 1000 N
     (*wheel)->e_spoke = 200000 * 3;  // 200000 N/mm^2 for steel approx; 2mm diameter spoke
@@ -202,7 +289,7 @@ int stress(const char *pattern) {
     LU_CHECK(rim_size(dbg, length, &holes));
     LU_CHECK(make_wheel(offsets, length, holes, padding, type, &wheel));
     LU_CHECK(lace(wheel));
-//    LU_CHECK(true(wheel));
+    LU_CHECK(true(wheel));
     LU_CHECK(make_path(dbg, pattern, &path));
     plot_wheel(wheel, path);
 
