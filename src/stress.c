@@ -158,7 +158,8 @@ int relax(wheel *wheel, double damping) {
         double l = length(spoke);
         // 1/l for strain, 1/l for normalization of spoke direction
         // stretched here, so l - l_spoke
-        forces[i_rim] = scalar_mult((l - wheel->l_spoke[i_hub]) * wheel->e_spoke / (l * l), spoke);
+//        forces[i_rim] = scalar_mult((l - wheel->l_spoke[i_hub]) * wheel->e_spoke / (l * l), spoke);
+        forces[i_rim] = scalar_mult((l - wheel->l_spoke[i_hub]) / l, spoke);
     }
 
     // forces on hole i from rim chord to either side
@@ -169,7 +170,8 @@ int relax(wheel *wheel, double damping) {
         xy chord = sub(after, before);  // points from i_before towards i_after
         double l = length(chord);
         // compressive here, so l_chord - l
-        xy force = scalar_mult((wheel->l_chord - l) * wheel->e_rim / (l * l), chord);  // points towards i_after
+//        xy force = scalar_mult((wheel->l_chord - l) * wheel->e_rim / (l * l), chord);  // points towards i_after
+        xy force = scalar_mult((wheel->l_chord - l) / l, chord);  // points towards i_after
         forces[i_after] = add(forces[i_after], force);
         int i_before = (i_after-1+wheel->n_holes) % wheel->n_holes;
         forces[i_before] = sub(forces[i_before], force);  // sub because pointing other way
@@ -179,10 +181,11 @@ int relax(wheel *wheel, double damping) {
     // apply force
     for (int i_rim = 0; i_rim < wheel->n_holes; ++i_rim) {
         acc_f += length(forces[i_rim]);
-        xy displacement = polar_scale(forces[i_rim], wheel->rim[i_rim],
-                damping * wheel->l_spoke[wheel->rim_to_hub[i_rim]] / wheel->e_spoke,
-                damping * wheel->l_chord / wheel->e_rim,
-                &acc_r, &acc_t);
+//        xy displacement = polar_scale(forces[i_rim], wheel->rim[i_rim],
+//                damping * wheel->l_spoke[wheel->rim_to_hub[i_rim]] / wheel->e_spoke,
+//                damping * wheel->l_chord / wheel->e_rim,
+//                &acc_r, &acc_t);
+        xy displacement = scalar_mult(damping, forces[i_rim]);
         wheel->rim[i_rim] = add(wheel->rim[i_rim], displacement);
     }
     ludebug(dbg, "Damping %5.3f; total r: %7.2emm, t: %7.2emm, f: %7.2eN", damping, acc_r, acc_t, acc_f);
@@ -194,9 +197,10 @@ LU_CLEANUP
 
 int true(wheel *wheel) {
     LU_STATUS
-    int n = 100;
+    int n = 1000;
     for (int i = 0; i < n; ++i) {
-        LU_CHECK(relax(wheel, pow(10, -1 + (i-n)/(n/3.0))))
+//        LU_CHECK(relax(wheel, pow(10, -1 + (i-n)/(n/3.0))))
+        LU_CHECK(relax(wheel, 0.1))
     }
     LU_NO_CLEANUP
 }
