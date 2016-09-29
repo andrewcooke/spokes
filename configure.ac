@@ -9,6 +9,7 @@ AM_PROG_CC_C_O
 PKG_CHECK_MODULES([CHECK], [check >= 0.9.0])
 AC_CHECK_LIB([lu], [ludebug], [], [AC_MSG_ERROR([No liblu found])])
 AC_CHECK_LIB([cairo], [cairo_create], [], [AC_MSG_ERROR([No libcairo found])])
+AC_CHECK_LIB([lapacke], [LAPACKE_dposv], [LIBS="$LIBS -llapacke -llapack -lopenblas -lm -lgfortran"], [AC_MSG_ERROR(["No lapacke found"])], [-llapack -lopenblas -lm -lgfortran])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([Makefile src/Makefile tests/Makefile])
 AC_OUTPUT

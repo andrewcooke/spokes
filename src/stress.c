@@ -3,7 +3,9 @@
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
-#include <cairo/cairo.h>
+
+#include "cairo/cairo.h"
+#include "lapacke_utils.h"
 
 #include "lu/status.h"
 #include "lu/log.h"
@@ -13,6 +15,8 @@
 #include "lib.h"
 
 lulog *dbg = NULL;
+
+#define LA_CHECK(log, stmt) if ((status = stmt)) {luerror(log, "LAPACKE error %d at %s:%d", status, __FILE__, __LINE__); goto exit;}
 
 
 typedef struct {
@@ -139,70 +143,124 @@ xy polar_scale(xy components, xy location, double radial, double tangential, dou
     return c;
 }
 
-int relax(wheel *wheel, double damping) {
+#define X 0
+#define Y 1
 
-    LU_STATUS
-    double acc_r = 0, acc_t = 0, acc_f = 0;
+void inc_a(double *a, int n, int xy_force, int i_force, int xy_posn, int i_posn, double value) {
+    a[2*n*2*i_posn + xy_posn + 2*i_force + xy_force] = value;
+}
 
-    xy *forces = NULL;  // force at hole[index]
-    LU_ALLOC(dbg, forces, wheel->n_holes)
-
-    // accumulate total force
-
-    // force on hole i_rim from spoke at hub i_hub
-    for (int i_rim = 0; i_rim < wheel->n_holes; ++i_rim) {
-        int i_hub = wheel->rim_to_hub[i_rim];
-        xy hub = wheel->hub[i_hub];
-        xy rim = wheel->rim[i_rim];
-        xy spoke = sub(hub, rim);  // points inwards towards hub
-        double l = length(spoke);
-        // 1/l for strain, 1/l for normalization of spoke direction
-        // stretched here, so l - l_spoke
-//        forces[i_rim] = scalar_mult((l - wheel->l_spoke[i_hub]) * wheel->e_spoke / (l * l), spoke);
-        forces[i_rim] = scalar_mult((l - wheel->l_spoke[i_hub]) / l, spoke);
-    }
-
-    // forces on hole i from rim chord to either side
-    // we are looking at the chord from i_after-1 (i_before) to i_after
-    xy before = wheel->rim[wheel->n_holes-1];
-    for (int i_after = 0; i_after < wheel->n_holes; ++i_after) {
-        xy after = wheel->rim[i_after];
-        xy chord = sub(after, before);  // points from i_before towards i_after
-        double l = length(chord);
-        // compressive here, so l_chord - l
-//        xy force = scalar_mult((wheel->l_chord - l) * wheel->e_rim / (l * l), chord);  // points towards i_after
-        xy force = scalar_mult((wheel->l_chord - l) / l, chord);  // points towards i_after
-        forces[i_after] = add(forces[i_after], force);
-        int i_before = (i_after-1+wheel->n_holes) % wheel->n_holes;
-        forces[i_before] = sub(forces[i_before], force);  // sub because pointing other way
-        before = after;
-    }
-
-    // apply force
-    for (int i_rim = 0; i_rim < wheel->n_holes; ++i_rim) {
-        acc_f += length(forces[i_rim]);
-//        xy displacement = polar_scale(forces[i_rim], wheel->rim[i_rim],
-//                damping * wheel->l_spoke[wheel->rim_to_hub[i_rim]] / wheel->e_spoke,
-//                damping * wheel->l_chord / wheel->e_rim,
-//                &acc_r, &acc_t);
-        xy displacement = scalar_mult(damping, forces[i_rim]);
-        wheel->rim[i_rim] = add(wheel->rim[i_rim], displacement);
-    }
-    ludebug(dbg, "Damping %5.3f; total r: %7.2emm, t: %7.2emm, f: %7.2eN", damping, acc_r, acc_t, acc_f);
-
-LU_CLEANUP
-    free(forces);
-    LU_RETURN
+void inc_b(double *b, int n, int xy_force, int i_force, double value) {
+    b[2*i_force + xy_force] = value;
 }
 
 int true(wheel *wheel) {
+
     LU_STATUS
-    int n = 1000;
-    for (int i = 0; i < n; ++i) {
-//        LU_CHECK(relax(wheel, pow(10, -1 + (i-n)/(n/3.0))))
-        LU_CHECK(relax(wheel, 0.1))
+
+    double *a, *b, *x;  // we're going to solve ax = b
+    int n = wheel->n_holes;
+    lapack_int *pivot;
+    double delta = 0.0;
+
+    // we interleave x,y and the arrays are column major so for hole i
+    // x[2i] = dx, x[2i+1] = dy
+    // and the force on hole i in the x direction is the sum over forces from j
+    // sum(j)(a[2n*2j+2i] * x[2j]) - b[2i]
+
+    LU_ALLOC(dbg, a, 4 * n * n)
+    LU_ALLOC(dbg, x, 2 * n)
+    LU_ALLOC(dbg, b, 2 * n)
+    LU_ALLOC(dbg, pivot, 2 * n);
+
+    // the length from (x1+dx1,y1+dy1) to (x2+dy2,y2+dy2) is approx (small dx,dy)
+    // l + (x2-x1)*(dx2-dx1)/l + (y2-y1)*(dy2-dy1)/l
+    // where l is the length from (x1,y1) to (x2,y2)
+    // you can get this by expanding the usual pythag expression as a taylor
+    // expansion in dx,dy or by simply looking at the trignometry involved.
+
+    // we want the force on an element whose at rest length is L:
+    // F = (l + (x2-x1)*(dx2-dx1)/l + (y2-y1)*(dy2-dy1)/l - L) * E
+    //   = ((x2-x1)*(dx2-dx1) + (y2-y1)*(dy2-dy1)) * E/l + (l-L) * E
+    // in the x direction, we need "cos theta":
+    // Fx = (x2-x1)/l * F
+    //    = ((x2-x1)*(dx2-dx1) + (y2-y1)*(dy2-dy1)) * (x2-x1)E/l^2 + (x2-x1)(1-L/l)E
+    //    = ax - b
+
+    // for spokes x1,y1 is fixed so dx1=dy1=0
+    for (int i_rim = 0; i_rim < n; ++i_rim) {
+        int i_hub = wheel->rim_to_hub[i_rim];
+
+        double x1 = wheel->hub[i_hub].x, y1 = wheel->hub[i_hub].y;
+        double x2 = wheel->rim[i_rim].x, y2 = wheel->rim[i_rim].y;
+        double delta_x = x2 - x1, delta_y = y2 - y1;
+        double l = sqrt(delta_x * delta_x + delta_y * delta_y), lsq = l * l;
+        double l0 = wheel->l_spoke[i_hub];
+        double e = wheel->e_spoke;
+
+        inc_a(a, n, X, i_rim, X, i_rim,  delta_x * delta_x * e / lsq);
+        inc_a(a, n, X, i_rim, Y, i_rim,  delta_x * delta_y * e / lsq);
+        inc_b(b, n, X, i_rim,           -delta_x * (1 - l0/l) * e);
+        inc_a(a, n, Y, i_rim, X, i_rim,  delta_y * delta_x * e / lsq);
+        inc_a(a, n, Y, i_rim, Y, i_rim,  delta_y * delta_y * e / lsq);
+        inc_b(b, n, Y, i_rim,           -delta_y * (1 - l0/l) * e);
     }
-    LU_NO_CLEANUP
+
+    // hub chords
+    for (int i_after = 0; i_after < n; ++i_after) {
+        int i_before = (i_after-1+n) % n;
+
+        double x1 = wheel->hub[i_before].x, y1 = wheel->hub[i_before].y;
+        double x2 = wheel->rim[i_after].x, y2 = wheel->rim[i_after].y;
+        double delta_x = x2 - x1, delta_y = y2 - y1;
+        double l = sqrt(delta_x * delta_x + delta_y * delta_y), lsq = l * l;
+        double l0 = wheel->l_chord;
+        double e = wheel->e_rim;
+
+        double fxx = delta_x * delta_x * e / lsq;
+        double fxy = delta_x * delta_y * e / lsq;
+        double fx =  delta_x * (1 - l0/l) * e;
+        double fyx = fxy;
+        double fyy = delta_y * delta_y * e / lsq;
+        double fy =  delta_y * (1 - l0/l) * e;
+
+        // above (spokes), rim is x2.  here, after is x2.  so same geometry.
+        inc_a(a, n, X, i_after,  X, i_after,   fxx);
+        inc_a(a, n, X, i_after,  Y, i_after,   fxy);
+        inc_a(a, n, X, i_after,  X, i_before, -fxx);
+        inc_a(a, n, X, i_after,  Y, i_before, -fxy);
+        inc_b(b, n, X, i_after,               -fx);
+        inc_a(a, n, Y, i_after,  X, i_after,   fyx);
+        inc_a(a, n, Y, i_after,  Y, i_after,   fyy);
+        inc_a(a, n, Y, i_after,  X, i_before, -fyx);
+        inc_a(a, n, Y, i_after,  Y, i_before, -fyy);
+        inc_b(b, n, Y, i_after,               -fy);
+
+        // forces on the other hole must be as above but reversed in sign
+        inc_a(a, n, X, i_before, X, i_before, -fxx);
+        inc_a(a, n, X, i_before, Y, i_before, -fxy);
+        inc_a(a, n, X, i_before, X, i_after,   fxx);
+        inc_a(a, n, X, i_before, Y, i_after,   fxy);
+        inc_b(b, n, X, i_before,               fx);
+        inc_a(a, n, Y, i_before, X, i_before, -fyx);
+        inc_a(a, n, Y, i_before, Y, i_before, -fyy);
+        inc_a(a, n, Y, i_before, X, i_after,   fyx);
+        inc_a(a, n, Y, i_before, Y, i_after,   fyy);
+        inc_b(b, n, Y, i_before,               fy);
+    }
+
+    LA_CHECK(dbg, LAPACKE_dgetrf(LAPACK_COL_MAJOR, 2*n, 2*n, a, 2*n, pivot))
+    LA_CHECK(dbg, LAPACKE_dgetrs(LAPACK_COL_MAJOR, 'N', 2*n, 2*n, a, 2*n, pivot, b, 2*n))
+
+    for (int i = 0; i < n; ++i) {
+        delta += sqrt(b[2*i]*b[2*i] + b[2*i+1]*b[2*i+1]);
+        wheel->rim[i].x += b[2*i];
+        wheel->rim[i].y += b[2*i+1];
+    }
+    ludebug(dbg, "Total shift %7.2gmm", delta);
+
+LU_CLEANUP
+    LU_RETURN
 }
 
 int lace(wheel *wheel) {
