@@ -147,18 +147,84 @@ xy polar_scale(xy components, xy location, double radial, double tangential, dou
 #define Y 1
 
 void inc_a(double *a, int n, int xy_force, int i_force, int xy_posn, int i_posn, double value) {
-    a[2*n*2*i_posn + xy_posn + 2*i_force + xy_force] = value;
+    a[2*n*(2*i_posn+xy_posn) + 2*i_force+xy_force] = value;
 }
 
 void inc_b(double *b, int n, int xy_force, int i_force, double value) {
-    b[2*i_force + xy_force] = value;
+    b[2*i_force+xy_force] = value;
+}
+
+void inc_spoke(wheel *wheel, double *a, double *b, int n, int i_rim,
+        double fxx, double fxy, double fx, double fyx, double fyy, double fy) {
+
+    inc_a(a, n, X, i_rim, X, i_rim, -fxx);
+    inc_a(a, n, X, i_rim, Y, i_rim, -fxy);
+    inc_b(b, n, X, i_rim,            fx);
+    inc_a(a, n, Y, i_rim, X, i_rim, -fyx);
+    inc_a(a, n, Y, i_rim, Y, i_rim, -fyy);
+    inc_b(b, n, Y, i_rim,            fy);
+
+    if (i_rim == 0 || 1) {
+        int i_hub = wheel->rim_to_hub[i_rim];
+        xy rim = wheel->rim[i_rim], hub = wheel->hub[i_hub];
+        double l0 = wheel->l_spoke[i_hub], l = length(sub(rim, hub));
+        ludebug(dbg, "Force at hole %d (%.0f,%.0f) from spoke extended %4.2f%% with modulus %.0f",
+                i_rim, wheel->rim[i_rim].x, wheel->rim[i_rim].y, 100 * (l - l0) / l0, wheel->e_spoke);
+        ludebug(dbg, "is (%.0f dx %+.0f dy %+.0f, %.0f dx %+.0f dy %+.0f)",
+                -fxx, -fxy, -fx, -fyx, -fyy, -fy);
+    }
+}
+
+void inc_chord(wheel *wheel, double *a, double *b, int n, int i_before, int i_after,
+        double fxx, double fxy, double fx, double fyx, double fyy, double fy) {
+
+    // before is x1, after is x2
+    inc_a(a, n, X, i_after,  X, i_before,  fxx);
+    inc_a(a, n, X, i_after,  Y, i_before,  fxy);
+    inc_a(a, n, X, i_after,  X, i_after,  -fxx);
+    inc_a(a, n, X, i_after,  Y, i_after,  -fxy);
+    inc_b(b, n, X, i_after,               -fx);
+    inc_a(a, n, Y, i_after,  X, i_before,  fyx);
+    inc_a(a, n, Y, i_after,  Y, i_before,  fyy);
+    inc_a(a, n, Y, i_after,  X, i_after,  -fyx);
+    inc_a(a, n, Y, i_after,  Y, i_after,  -fyy);
+    inc_b(b, n, Y, i_after,               -fy);
+
+    if (i_after == 0 || 1) {
+        xy after = wheel->rim[i_after], before = wheel->rim[i_before];
+        double l0 = wheel->l_chord, l = length(sub(after, before));
+        ludebug(dbg, "Force at hole %d xy2=(%.0f,%.0f) from chord to hole %d xy1=(%.0f,%.0f) compressed %4.2f%% with modulus %.0f",
+                i_after, after.x, after.y, i_before, before.x, before.y, 100 * (l0 - l) / l0, wheel->e_rim);
+        ludebug(dbg, "is (%.0f dx1 %+.0f dx2 %+.0f dy1 %+.0f dy2 %+.0f, %.0f dx1 %+.0f dx2 %+.0f dy1 %+.0f dy2 %+.0f)",
+                fxx, -fxx, fxy, -fxy, -fx, fyx, -fyx, fyy, -fyy, -fy);
+    }
+
+    inc_a(a, n, X, i_before, X, i_before, -fxx);
+    inc_a(a, n, X, i_before, Y, i_before, -fxy);
+    inc_a(a, n, X, i_before, X, i_after,   fxx);
+    inc_a(a, n, X, i_before, Y, i_after,   fxy);
+    inc_b(b, n, X, i_before,              -fx);
+    inc_a(a, n, Y, i_before, X, i_before, -fyx);
+    inc_a(a, n, Y, i_before, Y, i_before, -fyy);
+    inc_a(a, n, Y, i_before, X, i_after,   fyx);
+    inc_a(a, n, Y, i_before, Y, i_after,   fyy);
+    inc_b(b, n, Y, i_before,              -fy);
+
+    if (i_before == 0 || 1) {
+        xy after = wheel->rim[i_after], before = wheel->rim[i_before];
+        double l0 = wheel->l_chord, l = length(sub(after, before));
+        ludebug(dbg, "Force at hole %d xy1=(%.0f,%.0f) from chord to hole %d xy2=(%.0f,%.0f) compressed %4.2f%% with modulus %.0f",
+                i_before, before.x, before.y, i_after, after.x, after.y, 100 * (l0 - l) / l0, wheel->e_rim);
+        ludebug(dbg, "is (%.0f dx1 %+.0f dx2 %+.0f dy1 %+.0f dy2 %+.0f, %.0f dx1 %+.0f dx2 %+.0f dy1 %+.0f dy2 %+.0f)",
+                -fxx, fxx, -fxy, fxy, -fx, -fyx, fyx, -fyy, fyy, -fy);
+    }
 }
 
 int true(wheel *wheel) {
 
     LU_STATUS
 
-    double *a, *b, *x;  // we're going to solve ax = b
+    double *a, *b;  // we're going to solve ax = b
     int n = wheel->n_holes;
     lapack_int *pivot;
     double delta = 0.0;
@@ -169,7 +235,6 @@ int true(wheel *wheel) {
     // sum(j)(a[2n*2j+2i] * x[2j]) - b[2i]
 
     LU_ALLOC(dbg, a, 4 * n * n)
-    LU_ALLOC(dbg, x, 2 * n)
     LU_ALLOC(dbg, b, 2 * n)
     LU_ALLOC(dbg, pivot, 2 * n);
 
@@ -179,12 +244,13 @@ int true(wheel *wheel) {
     // you can get this by expanding the usual pythag expression as a taylor
     // expansion in dx,dy or by simply looking at the trignometry involved.
 
-    // we want the force on an element whose at rest length is L:
-    // F = (l + (x2-x1)*(dx2-dx1)/l + (y2-y1)*(dy2-dy1)/l - L) * E
-    //   = ((x2-x1)*(dx2-dx1) + (y2-y1)*(dy2-dy1)) * E/l + (l-L) * E
-    // in the x direction, we need "cos theta":
+    // the magnitude of the force on an element whose at rest length is L:
+    // F = -(l + (x2-x1)*(dx2-dx1)/l + (y2-y1)*(dy2-dy1)/l - L)/L * E
+    // (negative because if l > L then it's extended and wants to contract)
+    //   = -((x2-x1)*(dx2-dx1) + (y2-y1)*(dy2-dy1)) * E/(Ll) - (l-L)/L * E
+    // in the x direction, at x2, we need "cos theta":
     // Fx = (x2-x1)/l * F
-    //    = ((x2-x1)*(dx2-dx1) + (y2-y1)*(dy2-dy1)) * (x2-x1)E/l^2 + (x2-x1)(1-L/l)E
+    //    = -((x2-x1)*(dx2-dx1) + (y2-y1)*(dy2-dy1)) * (x2-x1)E/(Ll^2) - (x2-x1)(1/L-1/l)E
     //    = ax - b
 
     // for spokes x1,y1 is fixed so dx1=dy1=0
@@ -198,59 +264,39 @@ int true(wheel *wheel) {
         double l0 = wheel->l_spoke[i_hub];
         double e = wheel->e_spoke;
 
-        inc_a(a, n, X, i_rim, X, i_rim,  delta_x * delta_x * e / lsq);
-        inc_a(a, n, X, i_rim, Y, i_rim,  delta_x * delta_y * e / lsq);
-        inc_b(b, n, X, i_rim,           -delta_x * (1 - l0/l) * e);
-        inc_a(a, n, Y, i_rim, X, i_rim,  delta_y * delta_x * e / lsq);
-        inc_a(a, n, Y, i_rim, Y, i_rim,  delta_y * delta_y * e / lsq);
-        inc_b(b, n, Y, i_rim,           -delta_y * (1 - l0/l) * e);
+        double fxx = delta_x * delta_x * e / (l0 * lsq);
+        double fxy = delta_x * delta_y * e / (l0 * lsq);
+        double fx =  delta_x * (1/l0 - 1/l) * e;
+        double fyx = fxy;
+        double fyy = delta_y * delta_y * e / (l0 * lsq);
+        double fy =  delta_y * (1/l0 - 1/l) * e;
+
+        inc_spoke(wheel, a, b, n, i_rim, fxx, fxy, fx, fyx, fyy, fy);
     }
 
     // hub chords
     for (int i_after = 0; i_after < n; ++i_after) {
         int i_before = (i_after-1+n) % n;
 
-        double x1 = wheel->hub[i_before].x, y1 = wheel->hub[i_before].y;
+        double x1 = wheel->rim[i_before].x, y1 = wheel->rim[i_before].y;
         double x2 = wheel->rim[i_after].x, y2 = wheel->rim[i_after].y;
         double delta_x = x2 - x1, delta_y = y2 - y1;
         double l = sqrt(delta_x * delta_x + delta_y * delta_y), lsq = l * l;
         double l0 = wheel->l_chord;
         double e = wheel->e_rim;
 
-        double fxx = delta_x * delta_x * e / lsq;
-        double fxy = delta_x * delta_y * e / lsq;
-        double fx =  delta_x * (1 - l0/l) * e;
+        double fxx = delta_x * delta_x * e / (l0 * lsq);
+        double fxy = delta_x * delta_y * e / (l0 * lsq);
+        double fx =  delta_x * (1/l0 - 1/l) * e;
         double fyx = fxy;
-        double fyy = delta_y * delta_y * e / lsq;
-        double fy =  delta_y * (1 - l0/l) * e;
+        double fyy = delta_y * delta_y * e / (l0 * lsq);
+        double fy =  delta_y * (1/l0 - 1/l) * e;
 
-        // above (spokes), rim is x2.  here, after is x2.  so same geometry.
-        inc_a(a, n, X, i_after,  X, i_after,   fxx);
-        inc_a(a, n, X, i_after,  Y, i_after,   fxy);
-        inc_a(a, n, X, i_after,  X, i_before, -fxx);
-        inc_a(a, n, X, i_after,  Y, i_before, -fxy);
-        inc_b(b, n, X, i_after,               -fx);
-        inc_a(a, n, Y, i_after,  X, i_after,   fyx);
-        inc_a(a, n, Y, i_after,  Y, i_after,   fyy);
-        inc_a(a, n, Y, i_after,  X, i_before, -fyx);
-        inc_a(a, n, Y, i_after,  Y, i_before, -fyy);
-        inc_b(b, n, Y, i_after,               -fy);
-
-        // forces on the other hole must be as above but reversed in sign
-        inc_a(a, n, X, i_before, X, i_before, -fxx);
-        inc_a(a, n, X, i_before, Y, i_before, -fxy);
-        inc_a(a, n, X, i_before, X, i_after,   fxx);
-        inc_a(a, n, X, i_before, Y, i_after,   fxy);
-        inc_b(b, n, X, i_before,               fx);
-        inc_a(a, n, Y, i_before, X, i_before, -fyx);
-        inc_a(a, n, Y, i_before, Y, i_before, -fyy);
-        inc_a(a, n, Y, i_before, X, i_after,   fyx);
-        inc_a(a, n, Y, i_before, Y, i_after,   fyy);
-        inc_b(b, n, Y, i_before,               fy);
+        inc_chord(wheel, a, b, n, i_before, i_after, fxx, fxy, fx, fyx, fyy, fy);
     }
 
     LA_CHECK(dbg, LAPACKE_dgetrf(LAPACK_COL_MAJOR, 2*n, 2*n, a, 2*n, pivot))
-    LA_CHECK(dbg, LAPACKE_dgetrs(LAPACK_COL_MAJOR, 'N', 2*n, 2*n, a, 2*n, pivot, b, 2*n))
+    LA_CHECK(dbg, LAPACKE_dgetrs(LAPACK_COL_MAJOR, 'N', 2*n, 1, a, 2*n, pivot, b, 2*n))
 
     for (int i = 0; i < n; ++i) {
         delta += sqrt(b[2*i]*b[2*i] + b[2*i+1]*b[2*i+1]);
@@ -260,6 +306,9 @@ int true(wheel *wheel) {
     ludebug(dbg, "Total shift %7.2gmm", delta);
 
 LU_CLEANUP
+    free(a);
+    free(b);
+    free(pivot);
     LU_RETURN
 }
 
