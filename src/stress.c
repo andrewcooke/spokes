@@ -164,7 +164,7 @@ void inc_spoke(wheel *wheel, double *a, double *b, int n, int i_rim,
     inc_a(a, n, Y, i_rim, Y, i_rim, -fyy);
     inc_b(b, n, Y, i_rim,            fy);
 
-    if (i_rim == 0 || 1) {
+    if (i_rim == 31) {
         int i_hub = wheel->rim_to_hub[i_rim];
         xy rim = wheel->rim[i_rim], hub = wheel->hub[i_hub];
         double l0 = wheel->l_spoke[i_hub], l = length(sub(rim, hub));
@@ -190,7 +190,7 @@ void inc_chord(wheel *wheel, double *a, double *b, int n, int i_before, int i_af
     inc_a(a, n, Y, i_after,  Y, i_after,  -fyy);
     inc_b(b, n, Y, i_after,               -fy);
 
-    if (i_after == 0 || 1) {
+    if (i_after == 31) {
         xy after = wheel->rim[i_after], before = wheel->rim[i_before];
         double l0 = wheel->l_chord, l = length(sub(after, before));
         ludebug(dbg, "Force at hole %d xy2=(%.0f,%.0f) from chord to hole %d xy1=(%.0f,%.0f) compressed %4.2f%% with modulus %.0f",
@@ -210,7 +210,7 @@ void inc_chord(wheel *wheel, double *a, double *b, int n, int i_before, int i_af
     inc_a(a, n, Y, i_before, Y, i_after,   fyy);
     inc_b(b, n, Y, i_before,              -fy);
 
-    if (i_before == 0 || 1) {
+    if (i_before == 31) {
         xy after = wheel->rim[i_after], before = wheel->rim[i_before];
         double l0 = wheel->l_chord, l = length(sub(after, before));
         ludebug(dbg, "Force at hole %d xy1=(%.0f,%.0f) from chord to hole %d xy2=(%.0f,%.0f) compressed %4.2f%% with modulus %.0f",
@@ -220,11 +220,34 @@ void inc_chord(wheel *wheel, double *a, double *b, int n, int i_before, int i_af
     }
 }
 
+int validate(int n, double *a, double *x, double *b) {
+
+    LU_STATUS
+
+    double *b_test = NULL;
+
+    LU_ALLOC(dbg, b_test, n * n);
+
+    for (int i = 0; i < n; ++i) {
+        for (int j = 0; j < n; ++j) {
+            b_test[i] += a[n*j+i] * x[j];
+        }
+    }
+
+    for (int i = 0; i < n; ++i) {
+        luinfo(dbg, "%d: %g = %g (%g)", i, b_test[i], b[i], x[i]);
+    }
+
+LU_CLEANUP
+    free(b_test);
+    LU_RETURN
+}
+
 int true(wheel *wheel) {
 
     LU_STATUS
 
-    double *a, *b;  // we're going to solve ax = b
+    double *a = NULL, *b = NULL, *a_copy = NULL, *b_copy = NULL;  // we're going to solve ax = b
     int n = wheel->n_holes;
     lapack_int *pivot;
     double delta = 0.0;
@@ -295,8 +318,29 @@ int true(wheel *wheel) {
         inc_chord(wheel, a, b, n, i_before, i_after, fxx, fxy, fx, fyx, fyy, fy);
     }
 
+    for (int i = 0; i < 2 * n; ++i) {
+        printf("%d  ", i);
+        for (int j = 0; j < 2 * n; ++j) {
+            double value = a[i+2*n*j];
+            if (value) {
+                printf("%d %g  ", j, value);
+            }
+        }
+        printf("\n");
+    }
+
+    LU_ALLOC(dbg, a_copy, 4 * n * n);
+    memcpy(a_copy, a, 4 * n * n * sizeof(*a));
+    LU_ALLOC(dbg, b_copy, 2 * n);
+    memcpy(b_copy, b, 2 * n * sizeof(*b));
+
     LA_CHECK(dbg, LAPACKE_dgetrf(LAPACK_COL_MAJOR, 2*n, 2*n, a, 2*n, pivot))
     LA_CHECK(dbg, LAPACKE_dgetrs(LAPACK_COL_MAJOR, 'N', 2*n, 1, a, 2*n, pivot, b, 2*n))
+
+    double ferr, berr;
+    LA_CHECK(dbg, LAPACKE_dgerfs(LAPACK_COL_MAJOR, 'N', 2*n, 1, a_copy, 2*n, a, 2*n, pivot, b_copy, 2*n, b, 2*n,
+            &ferr, &berr));
+    luinfo(dbg, "Errors %g %g", ferr, berr);
 
     for (int i = 0; i < n; ++i) {
         delta += sqrt(b[2*i]*b[2*i] + b[2*i+1]*b[2*i+1]);
@@ -304,6 +348,8 @@ int true(wheel *wheel) {
         wheel->rim[i].y += b[2*i+1];
     }
     ludebug(dbg, "Total shift %7.2gmm", delta);
+
+    LU_CHECK(validate(2 * n, a_copy, b, b_copy))
 
 LU_CLEANUP
     free(a);
