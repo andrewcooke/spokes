@@ -5,6 +5,7 @@
 #include <math.h>
 
 #include "cairo/cairo.h"
+#include "cblas.h"
 #include "lapacke_utils.h"
 
 #include "lu/status.h"
@@ -87,34 +88,162 @@ void draw_line_xy(cairo_t *cr, xy a, xy b) {
     draw_line(cr, a.x, a.y, b.x, b.y);
 }
 
-void plot_wheel(wheel *wheel, const char *path) {
+void open_plot(wheel * wheel, int nx, int ny, double line_width, cairo_t **cr, cairo_surface_t **surface) {
 
-    int nx = 500, ny = 500;
-    double line_width = wheel->r_rim / 100;
+    *surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, ny, ny);
+    *cr = cairo_create(*surface);
 
-    cairo_surface_t *surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, ny, ny);
-    cairo_t *cr = cairo_create(surface);
+    cairo_set_source_rgb(*cr, 1.0, 1.0, 1.0);
+    cairo_paint(*cr);
 
-    cairo_set_source_rgb(cr, 1.0, 1.0, 1.0);
-    cairo_paint(cr);
+    cairo_translate(*cr, nx/2, ny/2);
+    cairo_scale(*cr, nx/(2.2 * wheel->r_rim), ny/(2.2 * wheel->r_rim));
 
-    cairo_translate(cr, nx/2, ny/2);
-    cairo_scale(cr, nx/(2.2 * wheel->r_rim), ny/(2.2 * wheel->r_rim));
+    cairo_set_line_width(*cr, line_width);
+    cairo_set_source_rgb(*cr, 0, 0, 0);
+}
 
-    cairo_set_line_width(cr, line_width);
-    cairo_set_source_rgb(cr, 0, 0, 0);
+void close_plot(cairo_t *cr, cairo_surface_t *surface, const char *path) {
+    cairo_surface_write_to_png(surface, path);
+    cairo_destroy(cr);
+    cairo_surface_destroy(surface);
+}
 
+void draw_wheel(cairo_t *cr, wheel *wheel) {
     for (int hub = 0; hub < wheel->n_holes; ++hub) {
         int rim = wheel->hub_to_rim[hub];
         draw_line_xy(cr, wheel->hub[hub], wheel->rim[rim]);
         draw_line_xy(cr, wheel->hub[hub], wheel->hub[(hub+1) % wheel->n_holes]);
         draw_line_xy(cr, wheel->rim[rim], wheel->rim[(rim+1) % wheel->n_holes]);
     }
+}
 
-    cairo_surface_write_to_png(surface, path);
-    cairo_destroy(cr);
-    cairo_surface_destroy(surface);
+void plot_wheel(wheel *wheel, const char *path) {
+    cairo_surface_t *surface = NULL;
+    cairo_t *cr = NULL;
+    open_plot(wheel, 500, 500, wheel->r_rim / 100, &cr, &surface);
+    draw_wheel(cr, wheel);
+    close_plot(cr, surface, path);
+}
 
+int draw_forces_for_radial_movement(cairo_t *cr, wheel *wheel, double *a, double *b) {
+
+    LU_STATUS
+
+    int n = wheel->n_holes;
+
+    double *dxy = NULL, *b_copy = NULL;
+    LU_ALLOC(dbg, dxy, 2 * n)
+    LU_ALLOC(dbg, b_copy, 2 * n)
+    memcpy(b_copy, b, 2 * n * sizeof(*b));
+
+    double extn = 1e-3;
+    for (int i = 0; i < n; ++i) {
+        dxy[2*i] = -extn * wheel->rim[i].x;
+        dxy[2*i+1] = -extn * wheel->rim[i].y;
+    }
+    cblas_dgemv(CblasColMajor, CblasNoTrans, 2*n, 2*n, 1, a, 2*n, dxy, 1, -1, b_copy, 1);  // b is in/out
+    cairo_set_source_rgb(cr, 1, 0, 0);
+    double mag = 1e-1;
+    for (int i = 0; i < n; ++i) {
+        draw_line(cr, wheel->rim[i].x, wheel->rim[i].y, wheel->rim[i].x+mag*b_copy[2*i], wheel->rim[i].y+mag*b_copy[2*i+1]);
+    }
+
+LU_CLEANUP
+    free(dxy);
+    free(b_copy);
+    LU_RETURN
+}
+
+int plot_forces_for_radial_movement(wheel *wheel, double *a, double *b, const char *path) {
+    LU_STATUS
+    cairo_surface_t *surface = NULL;
+    cairo_t *cr = NULL;
+    open_plot(wheel, 500, 500, wheel->r_rim / 100, &cr, &surface);
+    draw_wheel(cr, wheel);
+    LU_CHECK(draw_forces_for_radial_movement(cr, wheel, a, b))
+    close_plot(cr, surface, path);
+    LU_NO_CLEANUP
+}
+
+void rotate(double dtheta, double x1, double y1, double *x2, double *y2) {
+    double r = sqrt(x1*x1+ y1*y1), theta = atan2(y1, x1);
+    theta += dtheta;
+    *x2 = r * cos(theta);
+    *y2 = r * sin(theta);
+}
+
+int draw_forces_for_tangential_movement(cairo_t *cr, wheel *wheel, double *a, double *b, double dtheta) {
+
+    LU_STATUS
+
+    int n = wheel->n_holes;
+
+    double *dxy = NULL, *b_copy = NULL;
+    LU_ALLOC(dbg, dxy, 2 * n)
+    LU_ALLOC(dbg, b_copy, 2 * n)
+
+    double x1, y1, x2, y2;
+
+    x1 = wheel->rim[0].x;
+    y1 = wheel->rim[0].y;
+    rotate(1e5 * dtheta, x1, y1, &x2, &y2);
+    draw_line(cr, x1, y1, x2, y2);
+
+    double mag = 1e-1;
+    for (int i = 0; i < n; ++i) {
+
+        for (int j = 0; j < 2*n; ++j) dxy[j] = 0;
+        memcpy(b_copy, b, 2 * n * sizeof(*b));
+
+        x1 = wheel->rim[i].x;
+        y1 = wheel->rim[i].y;
+        rotate(dtheta, x1, y1, &x2, &y2);
+        dxy[2*i] = x2 - x1;
+        dxy[2*i+1] = y2 - y1;
+
+        cblas_dgemv(CblasColMajor, CblasNoTrans, 2*n, 2*n, 1, a, 2*n, dxy, 1, -1, b_copy, 1);  // b is in/out
+        draw_line(cr, wheel->rim[i].x, wheel->rim[i].y, wheel->rim[i].x+mag*b_copy[2*i], wheel->rim[i].y+mag*b_copy[2*i+1]);
+    }
+
+LU_CLEANUP
+    free(dxy);
+    free(b_copy);
+    LU_RETURN
+}
+
+int plot_forces_for_tangential_movement(wheel *wheel, double *a, double *b, const char *path) {
+    LU_STATUS
+    cairo_surface_t *surface = NULL;
+    cairo_t *cr = NULL;
+    open_plot(wheel, 500, 500, wheel->r_rim / 100, &cr, &surface);
+    draw_wheel(cr, wheel);
+    cairo_set_source_rgb(cr, 1, 0, 0);
+    LU_CHECK(draw_forces_for_tangential_movement(cr, wheel, a, b, 1e-6))
+    cairo_set_source_rgb(cr, 0, 1, 0);
+    LU_CHECK(draw_forces_for_tangential_movement(cr, wheel, a, b, -1e-6))
+    close_plot(cr, surface, path);
+    LU_NO_CLEANUP
+}
+
+void draw_displacements(cairo_t *cr, wheel *wheel, double *b) {
+    cairo_set_source_rgb(cr, 0, 1, 0);
+    int n = wheel->n_holes;
+    double mag = 1e-1;
+    for (int i = 0; i < n; ++i) {
+        draw_line(cr, wheel->rim[i].x, wheel->rim[i].y, wheel->rim[i].x+mag*b[2*i], wheel->rim[i].y+mag*b[2*i+1]);
+    }
+}
+
+int plot_displacements(wheel *wheel, double *b, const char *path) {
+    LU_STATUS
+    cairo_surface_t *surface = NULL;
+    cairo_t *cr = NULL;
+    open_plot(wheel, 500, 500, wheel->r_rim / 100, &cr, &surface);
+    draw_wheel(cr, wheel);
+    draw_displacements(cr, wheel, b);
+    close_plot(cr, surface, path);
+    LU_NO_CLEANUP
 }
 
 double angle_to_rim(wheel *wheel, int i_hub) {
@@ -147,11 +276,11 @@ xy polar_scale(xy components, xy location, double radial, double tangential, dou
 #define Y 1
 
 void inc_a(double *a, int n, int xy_force, int i_force, int xy_posn, int i_posn, double value) {
-    a[2*n*(2*i_posn+xy_posn) + 2*i_force+xy_force] = value;
+    a[2*n*(2*i_posn+xy_posn) + 2*i_force+xy_force] += value;
 }
 
 void inc_b(double *b, int n, int xy_force, int i_force, double value) {
-    b[2*i_force+xy_force] = value;
+    b[2*i_force+xy_force] += value;
 }
 
 void inc_spoke(wheel *wheel, double *a, double *b, int n, int i_rim,
@@ -243,7 +372,7 @@ LU_CLEANUP
     LU_RETURN
 }
 
-int true(wheel *wheel) {
+int true(wheel *wheel, double damping) {
 
     LU_STATUS
 
@@ -334,22 +463,28 @@ int true(wheel *wheel) {
     LU_ALLOC(dbg, b_copy, 2 * n);
     memcpy(b_copy, b, 2 * n * sizeof(*b));
 
+    LU_CHECK(plot_forces_for_radial_movement(wheel, a_copy, b_copy, "forces-radial.png"))
+    LU_CHECK(plot_forces_for_tangential_movement(wheel, a_copy, b_copy, "forces-tangential.png"))
+
     LA_CHECK(dbg, LAPACKE_dgetrf(LAPACK_COL_MAJOR, 2*n, 2*n, a, 2*n, pivot))
     LA_CHECK(dbg, LAPACKE_dgetrs(LAPACK_COL_MAJOR, 'N', 2*n, 1, a, 2*n, pivot, b, 2*n))
 
-    double ferr, berr;
-    LA_CHECK(dbg, LAPACKE_dgerfs(LAPACK_COL_MAJOR, 'N', 2*n, 1, a_copy, 2*n, a, 2*n, pivot, b_copy, 2*n, b, 2*n,
-            &ferr, &berr));
-    luinfo(dbg, "Errors %g %g", ferr, berr);
+//    double ferr, berr;
+//    LA_CHECK(dbg, LAPACKE_dgerfs(LAPACK_COL_MAJOR, 'N', 2*n, 1, a_copy, 2*n, a, 2*n, pivot, b_copy, 2*n, b, 2*n,
+//            &ferr, &berr));
+//    luinfo(dbg, "Errors %g %g", ferr, berr);
+
+    LU_CHECK(plot_displacements(wheel, b, "displacements.png"))
 
     for (int i = 0; i < n; ++i) {
-        delta += sqrt(b[2*i]*b[2*i] + b[2*i+1]*b[2*i+1]);
-        wheel->rim[i].x += b[2*i];
-        wheel->rim[i].y += b[2*i+1];
+        delta += damping * sqrt(b[2*i]*b[2*i] + b[2*i+1]*b[2*i+1]);
+        wheel->rim[i].x += damping * b[2*i];
+        wheel->rim[i].y += damping * b[2*i+1];
     }
     ludebug(dbg, "Total shift %7.2gmm", delta);
 
     LU_CHECK(validate(2 * n, a_copy, b, b_copy))
+
 
 LU_CLEANUP
     free(a);
@@ -446,7 +581,7 @@ int stress(const char *pattern) {
     LU_CHECK(rim_size(dbg, length, &holes));
     LU_CHECK(make_wheel(offsets, length, holes, padding, type, &wheel));
     LU_CHECK(lace(wheel));
-    LU_CHECK(true(wheel));
+    LU_CHECK(true(wheel, 1));
     LU_CHECK(make_path(dbg, pattern, &path));
     plot_wheel(wheel, path);
 
