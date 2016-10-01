@@ -126,32 +126,70 @@ void plot_wheel(wheel *wheel, const char *path) {
     close_plot(cr, surface, path);
 }
 
+int calculate_force(int n, double *a, double *x, double *b, double **result) {
+    LU_STATUS
+    LU_ALLOC(dbg, *result, 2 * n)
+    memcpy(*result, b, 2 * n * sizeof(*b));
+    cblas_dgemv(CblasColMajor, CblasNoTrans, 2*n, 2*n, 1, a, 2*n, x, 1, -1, *result, 1);
+    LU_NO_CLEANUP
+}
+
+int draw_forces_initial(cairo_t *cr, wheel *wheel, double *a, double *b) {
+
+    LU_STATUS
+
+    int n = wheel->n_holes;
+
+    double *dxy = NULL, *forces = NULL;
+    LU_ALLOC(dbg, dxy, 2 * n)
+    LU_CHECK(calculate_force(n, a, dxy, b, &forces))
+    cairo_set_source_rgb(cr, 0, 0, 1);
+    double mag = 0.1;
+    for (int i = 0; i < n; ++i) {
+        draw_line(cr, wheel->rim[i].x, wheel->rim[i].y, wheel->rim[i].x+mag*forces[2*i], wheel->rim[i].y+mag*forces[2*i+1]);
+    }
+
+LU_CLEANUP
+    free(dxy);
+    free(forces);
+    LU_RETURN
+}
+
+int plot_forces_initial(wheel *wheel, double *a, double *b, const char *path) {
+    LU_STATUS
+    cairo_surface_t *surface = NULL;
+    cairo_t *cr = NULL;
+    open_plot(wheel, 500, 500, wheel->r_rim / 100, &cr, &surface);
+    draw_wheel(cr, wheel);
+    LU_CHECK(draw_forces_initial(cr, wheel, a, b))
+    close_plot(cr, surface, path);
+    LU_NO_CLEANUP
+}
+
 int draw_forces_for_radial_movement(cairo_t *cr, wheel *wheel, double *a, double *b) {
 
     LU_STATUS
 
     int n = wheel->n_holes;
 
-    double *dxy = NULL, *b_copy = NULL;
+    double *dxy = NULL, *forces = NULL;
     LU_ALLOC(dbg, dxy, 2 * n)
-    LU_ALLOC(dbg, b_copy, 2 * n)
-    memcpy(b_copy, b, 2 * n * sizeof(*b));
 
     double extn = 1e-3;
     for (int i = 0; i < n; ++i) {
         dxy[2*i] = -extn * wheel->rim[i].x;
         dxy[2*i+1] = -extn * wheel->rim[i].y;
     }
-    cblas_dgemv(CblasColMajor, CblasNoTrans, 2*n, 2*n, 1, a, 2*n, dxy, 1, -1, b_copy, 1);  // b is in/out
+    LU_CHECK(calculate_force(n, a, dxy, b, &forces))
     cairo_set_source_rgb(cr, 1, 0, 0);
-    double mag = 1e-1;
+    double mag = 1e-3;
     for (int i = 0; i < n; ++i) {
-        draw_line(cr, wheel->rim[i].x, wheel->rim[i].y, wheel->rim[i].x+mag*b_copy[2*i], wheel->rim[i].y+mag*b_copy[2*i+1]);
+        draw_line(cr, wheel->rim[i].x, wheel->rim[i].y, wheel->rim[i].x+mag*forces[2*i], wheel->rim[i].y+mag*forces[2*i+1]);
     }
 
 LU_CLEANUP
     free(dxy);
-    free(b_copy);
+    free(forces);
     LU_RETURN
 }
 
@@ -179,9 +217,8 @@ int draw_forces_for_tangential_movement(cairo_t *cr, wheel *wheel, double *a, do
 
     int n = wheel->n_holes;
 
-    double *dxy = NULL, *b_copy = NULL;
+    double *dxy = NULL, *forces = NULL;
     LU_ALLOC(dbg, dxy, 2 * n)
-    LU_ALLOC(dbg, b_copy, 2 * n)
 
     double x1, y1, x2, y2;
 
@@ -194,7 +231,6 @@ int draw_forces_for_tangential_movement(cairo_t *cr, wheel *wheel, double *a, do
     for (int i = 0; i < n; ++i) {
 
         for (int j = 0; j < 2*n; ++j) dxy[j] = 0;
-        memcpy(b_copy, b, 2 * n * sizeof(*b));
 
         x1 = wheel->rim[i].x;
         y1 = wheel->rim[i].y;
@@ -202,13 +238,14 @@ int draw_forces_for_tangential_movement(cairo_t *cr, wheel *wheel, double *a, do
         dxy[2*i] = x2 - x1;
         dxy[2*i+1] = y2 - y1;
 
-        cblas_dgemv(CblasColMajor, CblasNoTrans, 2*n, 2*n, 1, a, 2*n, dxy, 1, -1, b_copy, 1);  // b is in/out
-        draw_line(cr, wheel->rim[i].x, wheel->rim[i].y, wheel->rim[i].x+mag*b_copy[2*i], wheel->rim[i].y+mag*b_copy[2*i+1]);
+        LU_CHECK(calculate_force(n, a, dxy, b, &forces))
+        draw_line(cr, wheel->rim[i].x, wheel->rim[i].y, wheel->rim[i].x+mag*forces[2*i], wheel->rim[i].y+mag*forces[2*i+1]);
+        free(forces); forces = NULL;
     }
 
 LU_CLEANUP
     free(dxy);
-    free(b_copy);
+    free(forces);
     LU_RETURN
 }
 
@@ -353,22 +390,14 @@ int validate(int n, double *a, double *x, double *b) {
 
     LU_STATUS
 
-    double *b_test = NULL;
-
-    LU_ALLOC(dbg, b_test, n * n);
-
+    double *forces = NULL;
+    LU_CHECK(calculate_force(n, a, x, b, &forces))
     for (int i = 0; i < n; ++i) {
-        for (int j = 0; j < n; ++j) {
-            b_test[i] += a[n*j+i] * x[j];
-        }
-    }
-
-    for (int i = 0; i < n; ++i) {
-        luinfo(dbg, "%d: %g = %g (%g)", i, b_test[i], b[i], x[i]);
+        luinfo(dbg, "%d: (%g, %g)", i, forces[2*i], forces[2*i+1]);
     }
 
 LU_CLEANUP
-    free(b_test);
+    free(forces);
     LU_RETURN
 }
 
@@ -463,6 +492,7 @@ int true(wheel *wheel, double damping) {
     LU_ALLOC(dbg, b_copy, 2 * n);
     memcpy(b_copy, b, 2 * n * sizeof(*b));
 
+    LU_CHECK(plot_forces_initial(wheel, a_copy, b_copy, "forces-initial.png"))
     LU_CHECK(plot_forces_for_radial_movement(wheel, a_copy, b_copy, "forces-radial.png"))
     LU_CHECK(plot_forces_for_tangential_movement(wheel, a_copy, b_copy, "forces-tangential.png"))
 
@@ -483,7 +513,7 @@ int true(wheel *wheel, double damping) {
     }
     ludebug(dbg, "Total shift %7.2gmm", delta);
 
-    LU_CHECK(validate(2 * n, a_copy, b, b_copy))
+    LU_CHECK(validate(n, a_copy, b, b_copy))
 
 
 LU_CLEANUP
@@ -552,6 +582,8 @@ int make_wheel(int *offsets, int length, int holes, int padding, char type, whee
     (*wheel)->tension = 1000;  // 100 kgf = 1000 N
     (*wheel)->e_spoke = 200000 * 3;  // 200000 N/mm^2 for steel approx; 2mm diameter spoke
     (*wheel)->e_rim = 100 * (*wheel)->e_spoke;
+//    (*wheel)->l_chord *= 1 + cos(M_PI * (1.0 - 1.0 / (2 * (*wheel)->n_holes))) * (*wheel)->tension / (*wheel)->e_spoke;
+    (*wheel)->l_chord *= 1.001;
     LU_NO_CLEANUP
 }
 
