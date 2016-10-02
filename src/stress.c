@@ -19,6 +19,9 @@ lulog *dbg = NULL;
 
 #define LA_CHECK(log, stmt) if ((status = stmt)) {luerror(log, "LAPACKE error %d at %s:%d", status, __FILE__, __LINE__); goto exit;}
 
+#define X 0
+#define Y 1
+
 
 typedef struct {
     double x;
@@ -146,7 +149,7 @@ int draw_forces_initial(cairo_t *cr, wheel *wheel, double *a, double *b) {
     cairo_set_source_rgb(cr, 0, 1, 1);
     double mag = 0.1;
     for (int i = 0; i < n; ++i) {
-        draw_line(cr, wheel->rim[i].x, wheel->rim[i].y, wheel->rim[i].x+mag*forces[2*i], wheel->rim[i].y+mag*forces[2*i+1]);
+        draw_line(cr, wheel->rim[i].x, wheel->rim[i].y, wheel->rim[i].x+mag*forces[2*i+X], wheel->rim[i].y+mag*forces[2*i+Y]);
     }
 
 LU_CLEANUP
@@ -177,14 +180,14 @@ int draw_forces_for_radial_movement(cairo_t *cr, wheel *wheel, double *a, double
 
     double extn = 1e-3;
     for (int i = 0; i < n; ++i) {
-        dxy[2*i] = -extn * wheel->rim[i].x;
-        dxy[2*i+1] = -extn * wheel->rim[i].y;
+        dxy[2*i+X] = -extn * wheel->rim[i].x;
+        dxy[2*i+Y] = -extn * wheel->rim[i].y;
     }
     LU_CHECK(calculate_force(n, a, dxy, b, &forces))
     cairo_set_source_rgb(cr, 1, 0, 0);
     double mag = 1e-3;
     for (int i = 0; i < n; ++i) {
-        draw_line(cr, wheel->rim[i].x, wheel->rim[i].y, wheel->rim[i].x+mag*forces[2*i], wheel->rim[i].y+mag*forces[2*i+1]);
+        draw_line(cr, wheel->rim[i].x, wheel->rim[i].y, wheel->rim[i].x+mag*forces[2*i+X], wheel->rim[i].y+mag*forces[2*i+Y]);
     }
 
 LU_CLEANUP
@@ -235,11 +238,11 @@ int draw_forces_for_tangential_movement(cairo_t *cr, wheel *wheel, double *a, do
         x1 = wheel->rim[i].x;
         y1 = wheel->rim[i].y;
         rotate(dtheta, x1, y1, &x2, &y2);
-        dxy[2*i] = x2 - x1;
-        dxy[2*i+1] = y2 - y1;
+        dxy[2*i+X] = x2 - x1;
+        dxy[2*i+Y] = y2 - y1;
 
         LU_CHECK(calculate_force(n, a, dxy, b, &forces))
-        draw_line(cr, wheel->rim[i].x, wheel->rim[i].y, wheel->rim[i].x+mag*forces[2*i], wheel->rim[i].y+mag*forces[2*i+1]);
+        draw_line(cr, wheel->rim[i].x, wheel->rim[i].y, wheel->rim[i].x+mag*forces[2*i+X], wheel->rim[i].y+mag*forces[2*i+Y]);
         free(forces); forces = NULL;
     }
 
@@ -268,7 +271,7 @@ void draw_displacements(cairo_t *cr, wheel *wheel, double *b) {
     int n = wheel->n_holes;
     double mag = 1e3;
     for (int i = 0; i < n; ++i) {
-        draw_line(cr, wheel->rim[i].x, wheel->rim[i].y, wheel->rim[i].x+mag*b[2*i], wheel->rim[i].y+mag*b[2*i+1]);
+        draw_line(cr, wheel->rim[i].x, wheel->rim[i].y, wheel->rim[i].x+mag*b[2*i+X], wheel->rim[i].y+mag*b[2*i+Y]);
     }
 }
 
@@ -308,9 +311,6 @@ xy polar_scale(xy components, xy location, double radial, double tangential, dou
     c.y = r * sin(theta) - t * cos(theta);
     return c;
 }
-
-#define X 0
-#define Y 1
 
 void inc_a(double *a, int n, int xy_force, int i_force, int xy_posn, int i_posn, double value) {
     a[2*n*(2*i_posn+xy_posn) + 2*i_force+xy_force] += value;
@@ -397,7 +397,7 @@ int validate(int n, double *a, double *x, double *b) {
     double *forces = NULL;
     LU_CHECK(calculate_force(n, a, x, b, &forces))
     for (int i = 0; i < n; ++i) {
-        luinfo(dbg, "%d: (%g, %g) (%g, %g)", i, forces[2*i], forces[2*i+1], x[2*i], x[2*i+1]);
+        luinfo(dbg, "%d: (%g, %g) (%g, %g)", i, forces[2*i+X], forces[2*i+Y], x[2*i+X], x[2*i+Y]);
     }
 
 LU_CLEANUP
@@ -444,7 +444,7 @@ int true(wheel *wheel, double damping) {
     double t0, dtdx2, dtdy2, cos_theta, sin_theta;
 
     // we interleave x,y and the arrays are column major so for hole i
-    // x[2i] = dx, x[2i+1] = dy
+    // x[2i+X] = dx, x[2i+Y] = dy
     // and the force on hole i in the x direction is the sum over forces from j
     // sum(j)(a[2n*2j+2i] * x[2j]) - b[2i]
 
@@ -500,9 +500,9 @@ int true(wheel *wheel, double damping) {
     LU_CHECK(plot_displacements(wheel, b, "displacements.png"))
 
     for (int i = 0; i < n; ++i) {
-        delta += damping * sqrt(b[2*i]*b[2*i] + b[2*i+1]*b[2*i+1]);
-        wheel->rim[i].x += damping * b[2*i];
-        wheel->rim[i].y += damping * b[2*i+1];
+        delta += damping * sqrt(b[2*i+X]*b[2*i+X] + b[2*i+Y]*b[2*i+Y]);
+        wheel->rim[i].x += damping * b[2*i+X];
+        wheel->rim[i].y += damping * b[2*i+Y];
     }
     ludebug(dbg, "Total shift %7.2gmm", delta);
 
