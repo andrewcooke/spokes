@@ -408,12 +408,6 @@ LU_CLEANUP
 void calc_tension(xy xy1, xy xy2, double l0, double e,
         double *t0, double *dtdx2, double *dtdy2, double *cos_theta, double *sin_theta) {
 
-    // the length from (x1+dx1,y1+dy1) to (x2+dy2,y2+dy2) is approx (small dx,dy)
-    // l + (x2-x1)*(dx2-dx1)/l + (y2-y1)*(dy2-dy1)/l
-    // where l is the length from (x1,y1) to (x2,y2)
-    // you can get this by expanding the usual pythag expression as a taylor
-    // expansion in dx,dy or by simply looking at the trignometry involved.
-
     // a line from x1,y1 to x2,y2 with length l makes an angle theta to
     // the horizontal where theta = atan2((y2-y1)/(x2-x1)),
     // cos(theta) = (x2-x1)/l and sin(theta) = (y2-y1)/l
