@@ -418,7 +418,7 @@ void calc_tension(xy xy1, xy xy2, double l0, double e,
 
     // if xy2 moves by dx2, dy2 then the new length is approx (1st order)
     // l + dx2 * cos(theta) + dy2 * sin(theta)
-    // (this isn't obvious to me, but you can show it from the taylor expansion
+    // this isn't obvious to me, but you can show it from the taylor expansion
     // of l^2 = (delta_x+dx)^2 + (delta_y+dy)^2
     // which gives
     // l' = l + delta_x * (dx2-dx1) / l + delta_y * (dy2-dy1) / l
