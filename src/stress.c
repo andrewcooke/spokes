@@ -269,7 +269,8 @@ int plot_forces_for_tangential_movement(wheel *wheel, double *a, double *b, cons
 void draw_displacements(cairo_t *cr, wheel *wheel, double *b) {
     cairo_set_source_rgb(cr, 0, 1, 0);
     int n = wheel->n_holes;
-    double mag = 1e3;
+//    double mag = 1e3;
+    double mag = 1;
     for (int i = 0; i < n; ++i) {
         draw_line(cr, wheel->rim[i].x, wheel->rim[i].y, wheel->rim[i].x+mag*b[2*i+X], wheel->rim[i].y+mag*b[2*i+Y]);
     }
@@ -321,13 +322,13 @@ void inc_b(double *b, int n, int xy_force, int i_force, double value) {
 }
 
 void inc_spoke(wheel *wheel, double *a, double *b, int n, int i_xy2,
-        double t0, double dtdx2, double dtdy2, double cos_theta, double sin_theta) {
+        double t, double dtdx2, double dtdy2, double cos_theta, double sin_theta) {
 
-    // x and y components of t0.  force is ax-b so need to negate b, but
+    // x and y components of t.  force is ax-b so need to negate b, but
     // this is a tension, so is already "-ve".
     // we just need to take the components.
-    inc_b(b, n, X, i_xy2,            t0 * cos_theta);
-    inc_b(b, n, Y, i_xy2,            t0 * sin_theta);
+    inc_b(b, n, X, i_xy2,            t * cos_theta);
+    inc_b(b, n, Y, i_xy2,            t * sin_theta);
 
     // the x and y components (left column) of the derivatives wrt x and y (right)
     // (in other words, left is where force is felt, right is who produces it)
@@ -344,19 +345,19 @@ void inc_spoke(wheel *wheel, double *a, double *b, int n, int i_xy2,
         ludebug(dbg, "Tension at hole %d (%.0f,%.0f) from spoke extended %4.2f%% with modulus %.0f",
                 i_xy2, wheel->rim[i_xy2].x, wheel->rim[i_xy2].y, 100 * (l - l0) / l0, wheel->e_spoke);
         ludebug(dbg, "is %0.f with derivative (along spoke) of %.0f dx %+.0f dy (cos %5.3f, sin %5.3f)",
-                t0, dtdx2, dtdy2, cos_theta, sin_theta);
+                t, dtdx2, dtdy2, cos_theta, sin_theta);
     }
 }
 
 void inc_chord(wheel *wheel, double *a, double *b, int n, int i_xy1, int i_xy2,
-        double t0, double dtdx2, double dtdy2, double cos_theta, double sin_theta) {
+        double t, double dtdx2, double dtdy2, double cos_theta, double sin_theta) {
 
-    // as for spokes, the t0 value is "already -ve" at xy2, but for xy1
+    // as for spokes, the t value is "already -ve" at xy2, but for xy1
     // we must reverse signs
-    inc_b(b, n, X, i_xy2,            t0 * cos_theta);
-    inc_b(b, n, Y, i_xy2,            t0 * sin_theta);
-    inc_b(b, n, X, i_xy1,           -t0 * cos_theta);
-    inc_b(b, n, Y, i_xy1,           -t0 * sin_theta);
+    inc_b(b, n, X, i_xy2,            t * cos_theta);
+    inc_b(b, n, Y, i_xy2,            t * sin_theta);
+    inc_b(b, n, X, i_xy1,           -t * cos_theta);
+    inc_b(b, n, Y, i_xy1,           -t * sin_theta);
 
     // again, for "xy2 xy2" we are the same as spokes
     inc_a(a, n, X, i_xy2, X, i_xy2, -dtdx2 * cos_theta);
@@ -386,7 +387,7 @@ void inc_chord(wheel *wheel, double *a, double *b, int n, int i_xy1, int i_xy2,
         ludebug(dbg, "Tension at hole %d (%.0f,%.0f) from rim chord at (%0.f,%0.f) extended %4.2f%% with modulus %.0f",
                 i_xy2, wheel->rim[i_xy2].x, wheel->rim[i_xy2].y, wheel->rim[i_xy1].x, wheel->rim[i_xy1].y, 100 * (l - l0) / l0, wheel->e_rim);
         ludebug(dbg, "is %0.f with derivative (along chord) of %.0f dx %+.0f dy (cos %5.3f, sin %5.3f)",
-                t0, dtdx2, dtdy2, cos_theta, sin_theta);
+                t, dtdx2, dtdy2, cos_theta, sin_theta);
     }
 }
 
@@ -406,7 +407,7 @@ LU_CLEANUP
 }
 
 void calc_tension(xy xy1, xy xy2, double l0, double e,
-        double *t0, double *dtdx2, double *dtdy2, double *cos_theta, double *sin_theta) {
+        double *t, double *dtdx2, double *dtdy2, double *cos_theta, double *sin_theta) {
 
     // a line from x1,y1 to x2,y2 with length l makes an angle theta to
     // the horizontal where theta = atan2((y2-y1)/(x2-x1)),
@@ -423,14 +424,16 @@ void calc_tension(xy xy1, xy xy2, double l0, double e,
     // which gives
     // l' = l + delta_x * (dx2-dx1) / l + delta_y * (dy2-dy1) / l
 
+    double dldx2 = delta_x / l, dldy2 = delta_y / l;
+
     // now tension is E(l-l0)/l0 where l0 is the original length
     // (tension is +ve when extended, ie when l > l0)
 
-    *t0 = e * (l - l0) / l0;
+    *t = e * (l - l0) / l0;
 
     // the derivative of tension wrt dx and dy are then
 
-    *dtdx2 = e * *cos_theta / l0; *dtdy2 = e * *sin_theta / l0;
+    *dtdx2 = e * dldx2 / l0; *dtdy2 = e * dldy2 / l0;
 }
 
 int true(wheel *wheel, double damping) {
@@ -441,34 +444,63 @@ int true(wheel *wheel, double damping) {
     int n = wheel->n_holes;
     lapack_int *pivot;
     double delta = 0.0;
-    double t0, dtdx2, dtdy2, cos_theta, sin_theta;
+    double t, dtdx2, dtdy2, cos_theta, sin_theta;
+
+    ludebug(dbg, "e  spoke %g, rim %g", wheel->e_spoke, wheel->e_rim);
+    ludebug(dbg, "chord length %g", wheel->l_chord);
+
+    ludebug(dbg, "hub");
+    for (int i = 0; i < n; ++i) {
+        printf("%d  %g, %g\n", i, wheel->hub[i].x, wheel->hub[i].y);
+    }
+
+    ludebug(dbg, "rim");
+    for (int i = 0; i < n; ++i) {
+        printf("%d  %g, %g\n", i, wheel->rim[i].x, wheel->rim[i].y);
+    }
+
+    ludebug(dbg, "spokes");
+    for (int i = 0; i < n; ++i) {
+        double l = length(sub(wheel->hub[i], wheel->rim[wheel->hub_to_rim[i]]));
+        printf("%d  %g, %g  (diff %g, force %g)\n", i, l, wheel->l_spoke[i], l - wheel->l_spoke[i],
+                wheel->e_spoke * (l - wheel->l_spoke[i]) / wheel->l_spoke[i]);
+    }
+
+    ludebug(dbg, "chords");
+    for (int i = 0; i < n; ++i) {
+        int j = (i - 1 + wheel->n_holes) % wheel->n_holes;
+        double l = length(sub(wheel->rim[i], wheel->rim[j]));
+        printf("%d-%d  %g, %g  (diff %g, force %g)\n", j, i,
+                l, wheel->l_chord, wheel->l_chord - l,
+                wheel->e_rim * (wheel->l_chord - l) / wheel->l_chord);
+    }
 
     // we interleave x,y and the arrays are column major so for hole i
     // x[2i+X] = dx, x[2i+Y] = dy
     // and the force on hole i in the x direction is the sum over forces from j
-    // sum(j)(a[2n*2j+2i] * x[2j]) - b[2i]
+    // sum(j)(a[2n*j+2i] * x[j]) - b[2i]
 
     LU_ALLOC(dbg, a, 4 * n * n)
     LU_ALLOC(dbg, b, 2 * n)
     LU_ALLOC(dbg, pivot, 2 * n);
 
-
     for (int i_rim = 0; i_rim < n; ++i_rim) {
         // for spokes xy1 is fixed, so we only need the tension etc at xy2
         int i_hub = wheel->rim_to_hub[i_rim];
         calc_tension(wheel->hub[i_hub], wheel->rim[i_rim], wheel->l_spoke[i_hub], wheel->e_spoke,
-                &t0, &dtdx2, &dtdy2, &cos_theta, &sin_theta);
-        inc_spoke(wheel, a, b, n, i_rim, t0, dtdx2, dtdy2, cos_theta, sin_theta);
+                &t, &dtdx2, &dtdy2, &cos_theta, &sin_theta);
+        inc_spoke(wheel, a, b, n, i_rim, t, dtdx2, dtdy2, cos_theta, sin_theta);
     }
 
     for (int i_xy2 = 0; i_xy2 < n; ++i_xy2) {
         // for rims the chord from xy1 to xy2 affects two holes
         int i_xy1 = (i_xy2-1+n) % n;
         calc_tension(wheel->rim[i_xy1], wheel->rim[i_xy2], wheel->l_chord, wheel->e_rim,
-                &t0, &dtdx2, &dtdy2, &cos_theta, &sin_theta);
-        inc_chord(wheel, a, b, n, i_xy1, i_xy2, t0, dtdx2, dtdy2, cos_theta, sin_theta);
+                &t, &dtdx2, &dtdy2, &cos_theta, &sin_theta);
+        inc_chord(wheel, a, b, n, i_xy1, i_xy2, t, dtdx2, dtdy2, cos_theta, sin_theta);
     }
 
+    ludebug(dbg, "A");
     for (int i = 0; i < 2 * n; ++i) {
         printf("%d  ", i);
         for (int j = 0; j < 2 * n; ++j) {
@@ -479,6 +511,15 @@ int true(wheel *wheel, double damping) {
         }
         printf("\n");
     }
+
+    ludebug(dbg, "b");
+    for (int i = 0; i < n; ++i) {
+        printf("%d  %g, %g\n", i, b[2*i+X], b[2*i+Y]);
+    }
+
+    double b_mag = 0;
+    for (int i = 0; i < 2 * n; ++i) b_mag += fabs(b[i]);
+    luinfo(dbg, "Total static force is %g", b_mag);
 
     LU_ALLOC(dbg, a_copy, 4 * n * n);
     memcpy(a_copy, a, 4 * n * n * sizeof(*a));
@@ -492,10 +533,15 @@ int true(wheel *wheel, double damping) {
     LA_CHECK(dbg, LAPACKE_dgetrf(LAPACK_COL_MAJOR, 2*n, 2*n, a, 2*n, pivot))
     LA_CHECK(dbg, LAPACKE_dgetrs(LAPACK_COL_MAJOR, 'N', 2*n, 1, a, 2*n, pivot, b, 2*n))
 
-    double ferr, berr;
-    LA_CHECK(dbg, LAPACKE_dgerfs(LAPACK_COL_MAJOR, 'N', 2*n, 1, a_copy, 2*n, a, 2*n, pivot, b_copy, 2*n, b, 2*n,
-            &ferr, &berr));
-    luinfo(dbg, "Errors %g %g", ferr, berr);
+//    double ferr, berr;
+//    LA_CHECK(dbg, LAPACKE_dgerfs(LAPACK_COL_MAJOR, 'N', 2*n, 1, a_copy, 2*n, a, 2*n, pivot, b_copy, 2*n, b, 2*n,
+//            &ferr, &berr));
+//    luinfo(dbg, "Errors %g %g", ferr, berr);
+
+    ludebug(dbg, "x");
+    for (int i = 0; i < n; ++i) {
+        printf("%d  %g, %g\n", i, b[2*i+X], b[2*i+Y]);
+    }
 
     LU_CHECK(plot_displacements(wheel, b, "displacements.png"))
 
@@ -603,10 +649,12 @@ int stress(const char *pattern) {
     LU_ASSERT(strchr("AB", type), LU_ERR, dbg, "Only symmetric types supported")
     LU_CHECK(dump_pattern(dbg, offsets, length));
     LU_CHECK(rim_size(dbg, length, &holes));
+    holes = 4;
     LU_CHECK(make_wheel(offsets, length, holes, padding, type, &wheel));
     LU_CHECK(lace(wheel));
+//    for (int i = 0; i < 100; ++i) LU_CHECK(true(wheel, 0.01));
     LU_CHECK(true(wheel, 1));
-//    LU_CHECK(true(wheel, 1));
+    LU_CHECK(true(wheel, 1));
     LU_CHECK(make_path(dbg, pattern, &path));
     plot_wheel(wheel, path);
 
