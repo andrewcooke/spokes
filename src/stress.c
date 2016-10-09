@@ -199,8 +199,8 @@ void calculate_neg_force(data *d, gsl_vector *neg_force) {
         xy *spoke = &d->spoke[i];
         double l = length(*spoke);
         // there's a missing - sign because derivative is -force
-        double fx = w->e_spoke * d->spoke_extension[i] * spoke->x / l;
-        double fy = w->e_spoke * d->spoke_extension[i] * spoke->y / l;
+        double fx = w->e_spoke * d->spoke_extension[i] * spoke->x / (l * w->l_spoke[i]);
+        double fy = w->e_spoke * d->spoke_extension[i] * spoke->y / (l * w->l_spoke[i]);
         gsl_vector_set(neg_force, 2*i+X, gsl_vector_get(neg_force, 2*i+X) + fx);
         gsl_vector_set(neg_force, 2*i+Y, gsl_vector_get(neg_force, 2*i+Y) + fy);
         ludebug(dbg, "Forces due to spoke %d: %g, %g", i, fx, fy);
@@ -209,8 +209,8 @@ void calculate_neg_force(data *d, gsl_vector *neg_force) {
     for (int i = 0; i < w ->n_holes; ++i) {
         xy *chord = &d->chord[i];
         double l = length(*chord);
-        double fx = w->e_rim * d->chord_compression[i] * chord->x / l;
-        double fy = w->e_rim * d->chord_compression[i] * chord->y / l;
+        double fx = w->e_rim * d->chord_compression[i] * chord->x / (l * w->l_chord);
+        double fy = w->e_rim * d->chord_compression[i] * chord->y / (l * w->l_chord);
         gsl_vector_set(neg_force, 2*i+X, gsl_vector_get(neg_force, 2*i+X) + fx);
         gsl_vector_set(neg_force, 2*i+Y, gsl_vector_get(neg_force, 2*i+Y) + fy);
         int j = (i - 1 + w->n_holes) % w->n_holes;
