@@ -373,9 +373,7 @@ LU_CLEANUP
 int true(wheel *w) {
 
     LU_STATUS
-    wheel *original = NULL;
 
-    LU_CHECK(copy_wheel(w, &original))
     LU_CHECK(relax(w))
 
     double r_target = 0, wobble = 2 * TARGET_WOBBLE;
@@ -397,7 +395,6 @@ int true(wheel *w) {
     }
 
 LU_CLEANUP
-    free_wheel(original);
     LU_RETURN
 }
 
