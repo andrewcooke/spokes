@@ -183,9 +183,9 @@ double angle_to_rim(wheel *wheel, int i_hub) {
 
 typedef struct {
     wheel *wheel;
-    double *spoke_extension;
+    double *spoke_strain;
     xy *spoke;
-    double *chord_compression;
+    double *chord_strain;
     xy *chord;
 } data;
 
@@ -193,9 +193,9 @@ void calculate_data(const gsl_vector *rim, data *d) {
 
     wheel *w = d->wheel;
 
-    memset(d->spoke_extension, 0, w->n_holes * sizeof(*d->spoke_extension));
+    memset(d->spoke_strain, 0, w->n_holes * sizeof(*d->spoke_strain));
     memset(d->spoke, 0, w->n_holes * sizeof(*d->spoke));
-    memset(d->chord_compression, 0, w->n_holes * sizeof(*d->chord_compression));
+    memset(d->chord_strain, 0, w->n_holes * sizeof(*d->chord_strain));
     memset(d->chord, 0, w->n_holes * sizeof(*d->chord));
 
     for (int i = 0; i < w->n_holes; ++i) {
@@ -203,8 +203,9 @@ void calculate_data(const gsl_vector *rim, data *d) {
         xy *spoke = &d->spoke[i];
         spoke->x = gsl_vector_get(rim, 2*i+X) - hub->x;
         spoke->y = gsl_vector_get(rim, 2*i+Y) - hub->y;
-        d->spoke_extension[i] = length(*spoke) - w->l_spoke[w->rim_to_hub[i]];
-//        ludebug(dbg, "Spoke %d extended by %gmm", i, d->spoke_extension[i]);
+        double l = w->l_spoke[w->rim_to_hub[i]];
+        d->spoke_strain[i] = (length(*spoke) - l) / l;;
+//        ludebug(dbg, "Spoke %d extended by %g%%", i, 100 * d->spoke_extension[i]);
     }
 
     for (int after = 0; after < w ->n_holes; ++after) {
@@ -212,8 +213,8 @@ void calculate_data(const gsl_vector *rim, data *d) {
         xy *chord = &d->chord[after];
         chord->x = gsl_vector_get(rim, 2*after+X) - gsl_vector_get(rim, 2*before+X);
         chord->y = gsl_vector_get(rim, 2*after+Y) - gsl_vector_get(rim, 2*before+Y);
-        d->chord_compression[after] = w->l_chord - length(*chord);
-//        ludebug(dbg, "Chord %d compressed by %gmm", after, d->chord_compression[after]);
+        d->chord_strain[after] = (length(*chord) - w->l_chord) / w->l_chord;
+//        ludebug(dbg, "Chord %d compressed by %g%%", after, 100 * d->chord_compression[after]);
     }
 }
 
@@ -223,11 +224,11 @@ void calculate_energy(data *d, double *energy) {
     *energy = 0;
 
     for (int i = 0; i < w->n_holes; ++i) {
-        double strain = d->spoke_extension[i] / w->l_spoke[i];
+        double strain = d->spoke_strain[i];
         *energy += w->e_spoke * strain * strain / 2;
     }
     for (int i = 0; i < w ->n_holes; ++i) {
-        double strain = d->chord_compression[i] / w->l_chord;
+        double strain = d->chord_strain[i];
         *energy += w->e_rim * strain * strain / 2;
     }
 }
@@ -242,8 +243,8 @@ void calculate_neg_force(data *d, gsl_vector *neg_force) {
         xy *spoke = &d->spoke[i];
         double l = length(*spoke);
         // there's a missing - sign because derivative is -force
-        double fx = w->e_spoke * d->spoke_extension[i] * spoke->x / (l * w->l_spoke[i]);
-        double fy = w->e_spoke * d->spoke_extension[i] * spoke->y / (l * w->l_spoke[i]);
+        double fx = w->e_spoke * d->spoke_strain[i] * spoke->x / l;
+        double fy = w->e_spoke * d->spoke_strain[i] * spoke->y / l;
         gsl_vector_set(neg_force, 2*i+X, gsl_vector_get(neg_force, 2*i+X) + fx);
         gsl_vector_set(neg_force, 2*i+Y, gsl_vector_get(neg_force, 2*i+Y) + fy);
 //        ludebug(dbg, "Forces due to spoke %d: %g, %g", i, fx, fy);
@@ -252,13 +253,13 @@ void calculate_neg_force(data *d, gsl_vector *neg_force) {
     for (int i = 0; i < w ->n_holes; ++i) {
         xy *chord = &d->chord[i];
         double l = length(*chord);
-        double fx = w->e_rim * d->chord_compression[i] * chord->x / (l * w->l_chord);
-        double fy = w->e_rim * d->chord_compression[i] * chord->y / (l * w->l_chord);
-        gsl_vector_set(neg_force, 2*i+X, gsl_vector_get(neg_force, 2*i+X) + fx);
-        gsl_vector_set(neg_force, 2*i+Y, gsl_vector_get(neg_force, 2*i+Y) + fy);
+        double fx = w->e_rim * d->chord_strain[i] * chord->x / l;
+        double fy = w->e_rim * d->chord_strain[i] * chord->y / l;
+        gsl_vector_set(neg_force, 2*i+X, gsl_vector_get(neg_force, 2*i+X) - fx);
+        gsl_vector_set(neg_force, 2*i+Y, gsl_vector_get(neg_force, 2*i+Y) - fy);
         int j = (i - 1 + w->n_holes) % w->n_holes;
-        gsl_vector_set(neg_force, 2*j+X, gsl_vector_get(neg_force, 2*j+X) - fx);
-        gsl_vector_set(neg_force, 2*j+Y, gsl_vector_get(neg_force, 2*j+Y) - fy);
+        gsl_vector_set(neg_force, 2*j+X, gsl_vector_get(neg_force, 2*j+X) + fx);
+        gsl_vector_set(neg_force, 2*j+Y, gsl_vector_get(neg_force, 2*j+Y) + fy);
 //        ludebug(dbg, "Forces due to chord %d: %g, %g", i, fx, fy);
     }
 
@@ -304,9 +305,9 @@ int relax(wheel *wheel) {
     LU_ALLOC(dbg, d, 1);
     d->wheel = wheel;
     LU_ALLOC(dbg, d->spoke, wheel->n_holes);
-    LU_ALLOC(dbg, d->spoke_extension, wheel->n_holes);
+    LU_ALLOC(dbg, d->spoke_strain, wheel->n_holes);
     LU_ALLOC(dbg, d->chord, wheel->n_holes);
-    LU_ALLOC(dbg, d->chord_compression, wheel->n_holes);
+    LU_ALLOC(dbg, d->chord_strain, wheel->n_holes);
 
     callbacks.n = 2 * wheel->n_holes;
     callbacks.params = d;
@@ -334,6 +335,7 @@ int relax(wheel *wheel) {
         gsl_status = gsl_multimin_fdfminimizer_iterate(s);
         if (gsl_status == GSL_ENOPROG) {
             luwarn(dbg, "Cannot progress");
+        // below not necessary - could consider restart
 //        } else if (!gsl_status && iter < 1) {
 //            ludebug(dbg, "Forcing new iteration");
 //            gsl_status = GSL_CONTINUE;
@@ -360,9 +362,9 @@ LU_CLEANUP
     gsl_vector_free(rim);
     if (d) {
         free(d->spoke);
-        free(d->spoke_extension);
+        free(d->spoke_strain);
         free(d->chord);
-        free(d->chord_compression);
+        free(d->chord_strain);
         free(d);
     }
     LU_RETURN
