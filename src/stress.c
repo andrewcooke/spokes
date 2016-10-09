@@ -5,8 +5,8 @@
 #include <math.h>
 
 #include "cairo/cairo.h"
-#include "cblas.h"
-#include "lapacke_utils.h"
+#include "gsl/gsl_multimin.h"
+#include "gsl/gsl_vector.h"
 
 #include "lu/status.h"
 #include "lu/log.h"
@@ -16,8 +16,6 @@
 #include "lib.h"
 
 lulog *dbg = NULL;
-
-#define LA_CHECK(log, stmt) if ((status = stmt)) {luerror(log, "LAPACKE error %d at %s:%d", status, __FILE__, __LINE__); goto exit;}
 
 #define X 0
 #define Y 1
@@ -129,164 +127,6 @@ void plot_wheel(wheel *wheel, const char *path) {
     close_plot(cr, surface, path);
 }
 
-int calculate_force(int n, double *a, double *x, double *b, double **result) {
-    LU_STATUS
-    LU_ALLOC(dbg, *result, 2 * n)
-    memcpy(*result, b, 2 * n * sizeof(*b));
-    cblas_dgemv(CblasColMajor, CblasNoTrans, 2*n, 2*n, 1, a, 2*n, x, 1, -1, *result, 1);
-    LU_NO_CLEANUP
-}
-
-int draw_forces_initial(cairo_t *cr, wheel *wheel, double *a, double *b) {
-
-    LU_STATUS
-
-    int n = wheel->n_holes;
-
-    double *dxy = NULL, *forces = NULL;
-    LU_ALLOC(dbg, dxy, 2 * n)
-    LU_CHECK(calculate_force(n, a, dxy, b, &forces))
-    cairo_set_source_rgb(cr, 0, 1, 1);
-    double mag = 0.1;
-    for (int i = 0; i < n; ++i) {
-        draw_line(cr, wheel->rim[i].x, wheel->rim[i].y, wheel->rim[i].x+mag*forces[2*i+X], wheel->rim[i].y+mag*forces[2*i+Y]);
-    }
-
-LU_CLEANUP
-    free(dxy);
-    free(forces);
-    LU_RETURN
-}
-
-int plot_forces_initial(wheel *wheel, double *a, double *b, const char *path) {
-    LU_STATUS
-    cairo_surface_t *surface = NULL;
-    cairo_t *cr = NULL;
-    open_plot(wheel, 500, 500, wheel->r_rim / 100, &cr, &surface);
-    draw_wheel(cr, wheel);
-    LU_CHECK(draw_forces_initial(cr, wheel, a, b))
-    close_plot(cr, surface, path);
-    LU_NO_CLEANUP
-}
-
-int draw_forces_for_radial_movement(cairo_t *cr, wheel *wheel, double *a, double *b) {
-
-    LU_STATUS
-
-    int n = wheel->n_holes;
-
-    double *dxy = NULL, *forces = NULL;
-    LU_ALLOC(dbg, dxy, 2 * n)
-
-    double extn = 1e-3;
-    for (int i = 0; i < n; ++i) {
-        dxy[2*i+X] = -extn * wheel->rim[i].x;
-        dxy[2*i+Y] = -extn * wheel->rim[i].y;
-    }
-    LU_CHECK(calculate_force(n, a, dxy, b, &forces))
-    cairo_set_source_rgb(cr, 1, 0, 0);
-    double mag = 1e-3;
-    for (int i = 0; i < n; ++i) {
-        draw_line(cr, wheel->rim[i].x, wheel->rim[i].y, wheel->rim[i].x+mag*forces[2*i+X], wheel->rim[i].y+mag*forces[2*i+Y]);
-    }
-
-LU_CLEANUP
-    free(dxy);
-    free(forces);
-    LU_RETURN
-}
-
-int plot_forces_for_radial_movement(wheel *wheel, double *a, double *b, const char *path) {
-    LU_STATUS
-    cairo_surface_t *surface = NULL;
-    cairo_t *cr = NULL;
-    open_plot(wheel, 500, 500, wheel->r_rim / 100, &cr, &surface);
-    draw_wheel(cr, wheel);
-    LU_CHECK(draw_forces_for_radial_movement(cr, wheel, a, b))
-    close_plot(cr, surface, path);
-    LU_NO_CLEANUP
-}
-
-void rotate(double dtheta, double x1, double y1, double *x2, double *y2) {
-    double r = sqrt(x1*x1+ y1*y1), theta = atan2(y1, x1);
-    theta += dtheta;
-    *x2 = r * cos(theta);
-    *y2 = r * sin(theta);
-}
-
-int draw_forces_for_tangential_movement(cairo_t *cr, wheel *wheel, double *a, double *b, double dtheta) {
-
-    LU_STATUS
-
-    int n = wheel->n_holes;
-
-    double *dxy = NULL, *forces = NULL;
-    LU_ALLOC(dbg, dxy, 2 * n)
-
-    double x1, y1, x2, y2;
-
-    x1 = wheel->rim[0].x;
-    y1 = wheel->rim[0].y;
-    rotate(1e5 * dtheta, x1, y1, &x2, &y2);
-    draw_line(cr, x1, y1, x2, y2);
-
-    double mag = 1e-1;
-    for (int i = 0; i < n; ++i) {
-
-        for (int j = 0; j < 2*n; ++j) dxy[j] = 0;
-
-        x1 = wheel->rim[i].x;
-        y1 = wheel->rim[i].y;
-        rotate(dtheta, x1, y1, &x2, &y2);
-        dxy[2*i+X] = x2 - x1;
-        dxy[2*i+Y] = y2 - y1;
-
-        LU_CHECK(calculate_force(n, a, dxy, b, &forces))
-        draw_line(cr, wheel->rim[i].x, wheel->rim[i].y, wheel->rim[i].x+mag*forces[2*i+X], wheel->rim[i].y+mag*forces[2*i+Y]);
-        free(forces); forces = NULL;
-    }
-
-LU_CLEANUP
-    free(dxy);
-    free(forces);
-    LU_RETURN
-}
-
-int plot_forces_for_tangential_movement(wheel *wheel, double *a, double *b, const char *path) {
-    LU_STATUS
-    cairo_surface_t *surface = NULL;
-    cairo_t *cr = NULL;
-    open_plot(wheel, 500, 500, wheel->r_rim / 100, &cr, &surface);
-    draw_wheel(cr, wheel);
-    cairo_set_source_rgb(cr, 1, 0, 0);
-    LU_CHECK(draw_forces_for_tangential_movement(cr, wheel, a, b, 1e-6))
-    cairo_set_source_rgb(cr, 0, 1, 0);
-    LU_CHECK(draw_forces_for_tangential_movement(cr, wheel, a, b, -1e-6))
-    close_plot(cr, surface, path);
-    LU_NO_CLEANUP
-}
-
-void draw_displacements(cairo_t *cr, wheel *wheel, double *b) {
-    cairo_set_source_rgb(cr, 0, 1, 0);
-    int n = wheel->n_holes;
-//    double mag = 1e3;
-    double mag = 1;
-    for (int i = 0; i < n; ++i) {
-        draw_line(cr, wheel->rim[i].x, wheel->rim[i].y, wheel->rim[i].x+mag*b[2*i+X], wheel->rim[i].y+mag*b[2*i+Y]);
-    }
-}
-
-int plot_displacements(wheel *wheel, double *b, const char *path) {
-    LU_STATUS
-    cairo_surface_t *surface = NULL;
-    cairo_t *cr = NULL;
-    open_plot(wheel, 500, 500, wheel->r_rim / 100, &cr, &surface);
-    draw_wheel(cr, wheel);
-    draw_displacements(cr, wheel, b);
-    close_plot(cr, surface, path);
-    LU_NO_CLEANUP
-}
-
 double angle_to_rim(wheel *wheel, int i_hub) {
     int i_rim = wheel->hub_to_rim[i_hub];
     xy hub = wheel->hub[i_hub];
@@ -300,265 +140,168 @@ double angle_to_rim(wheel *wheel, int i_hub) {
     return M_PI / 2 - psi + theta;
 }
 
-xy polar_scale(xy components, xy location, double radial, double tangential, double *acc_r, double *acc_t) {
-    xy n = norm(location);
-    double r = radial * (components.x * n.x + components.y * n.y);
-    double t = tangential * (components.x * n.y - components.x * n.x);
-    *acc_r = *acc_r + fabs(r);
-    *acc_t = *acc_t + fabs(t);
-    double theta = atan2(location.y, location.x);
-    xy c;
-    c.x = r * cos(theta) + t * sin(theta);
-    c.y = r * sin(theta) - t * cos(theta);
-    return c;
-}
+typedef struct {
+    wheel *wheel;
+    double *spoke_extension;
+    xy *spoke;
+    double *chord_compression;
+    xy *chord;
+} data;
 
-void inc_a(double *a, int n, int xy_force, int i_force, int xy_posn, int i_posn, double value) {
-    a[2*n*(2*i_posn+xy_posn) + 2*i_force+xy_force] += value;
-}
+void calculate_data(const gsl_vector *rim, data *d) {
 
-void inc_b(double *b, int n, int xy_force, int i_force, double value) {
-    b[2*i_force+xy_force] += value;
-}
+    wheel *w = d->wheel;
 
-void inc_spoke(wheel *wheel, double *a, double *b, int n, int i_xy2,
-        double t, double dtdx2, double dtdy2, double cos_theta, double sin_theta) {
+    memset(d->spoke_extension, 0, w->n_holes * sizeof(*d->spoke_extension));
+    memset(d->spoke, 0, w->n_holes * sizeof(*d->spoke));
+    memset(d->chord_compression, 0, w->n_holes * sizeof(*d->chord_compression));
+    memset(d->chord, 0, w->n_holes * sizeof(*d->chord));
 
-    // x and y components of t.  force is ax-b so need to negate b, but
-    // this is a tension, so is already "-ve".
-    // we just need to take the components.
-    inc_b(b, n, X, i_xy2,            t * cos_theta);
-    inc_b(b, n, Y, i_xy2,            t * sin_theta);
+    for (int i = 0; i < w->n_holes; ++i) {
+        xy *hub = &w->hub[w->rim_to_hub[i]];
+        xy *spoke = &d->spoke[i];
+        spoke->x = gsl_vector_get(rim, 2*i+X) - hub->x;
+        spoke->y = gsl_vector_get(rim, 2*i+Y) - hub->y;
+        d->spoke_extension[i] = length(*spoke) - w->l_spoke[w->rim_to_hub[i]];
+        ludebug(dbg, "Spoke %d extended by %gmm", i, d->spoke_extension[i]);
+    }
 
-    // the x and y components (left column) of the derivatives wrt x and y (right)
-    // (in other words, left is where force is felt, right is who produces it)
-    // this is tension so we need to negate for force.
-    inc_a(a, n, X, i_xy2, X, i_xy2, -dtdx2 * cos_theta);
-    inc_a(a, n, X, i_xy2, Y, i_xy2, -dtdy2 * cos_theta);
-    inc_a(a, n, Y, i_xy2, X, i_xy2, -dtdx2 * sin_theta);
-    inc_a(a, n, Y, i_xy2, Y, i_xy2, -dtdy2 * sin_theta);
-
-    if (i_xy2 == 0) {
-        int i_hub = wheel->rim_to_hub[i_xy2];
-        xy rim = wheel->rim[i_xy2], hub = wheel->hub[i_hub];
-        double l0 = wheel->l_spoke[i_hub], l = length(sub(rim, hub));
-        ludebug(dbg, "Tension at hole %d (%.0f,%.0f) from spoke extended %4.2f%% with modulus %.0f",
-                i_xy2, wheel->rim[i_xy2].x, wheel->rim[i_xy2].y, 100 * (l - l0) / l0, wheel->e_spoke);
-        ludebug(dbg, "is %0.f with derivative (along spoke) of %.0f dx %+.0f dy (cos %5.3f, sin %5.3f)",
-                t, dtdx2, dtdy2, cos_theta, sin_theta);
+    for (int after = 0; after < w ->n_holes; ++after) {
+        int before = (after - 1 + w->n_holes) % w->n_holes;
+        xy *chord = &d->chord[after];
+        chord->x = gsl_vector_get(rim, 2*after+X) - gsl_vector_get(rim, 2*before+X);
+        chord->y = gsl_vector_get(rim, 2*after+Y) - gsl_vector_get(rim, 2*before+Y);
+        d->chord_compression[after] = w->l_chord - length(*chord);
+        ludebug(dbg, "Chord %d compressed by %gmm", after, d->chord_compression[after]);
     }
 }
 
-void inc_chord(wheel *wheel, double *a, double *b, int n, int i_xy1, int i_xy2,
-        double t, double dtdx2, double dtdy2, double cos_theta, double sin_theta) {
+void calculate_energy(data *d, double *energy) {
 
-    // as for spokes, the t value is "already -ve" at xy2, but for xy1
-    // we must reverse signs
-    inc_b(b, n, X, i_xy2,            t * cos_theta);
-    inc_b(b, n, Y, i_xy2,            t * sin_theta);
-    inc_b(b, n, X, i_xy1,           -t * cos_theta);
-    inc_b(b, n, Y, i_xy1,           -t * sin_theta);
+    wheel *w = d->wheel;
+    *energy = 0;
 
-    // again, for "xy2 xy2" we are the same as spokes
-    inc_a(a, n, X, i_xy2, X, i_xy2, -dtdx2 * cos_theta);
-    inc_a(a, n, X, i_xy2, Y, i_xy2, -dtdy2 * cos_theta);
-    inc_a(a, n, Y, i_xy2, X, i_xy2, -dtdx2 * sin_theta);
-    inc_a(a, n, Y, i_xy2, Y, i_xy2, -dtdy2 * sin_theta);
-
-    // but for other combinations, signs swap accordingly
-    inc_a(a, n, X, i_xy2, X, i_xy1,  dtdx2 * cos_theta);
-    inc_a(a, n, X, i_xy2, Y, i_xy1,  dtdy2 * cos_theta);
-    inc_a(a, n, Y, i_xy2, X, i_xy1,  dtdx2 * sin_theta);
-    inc_a(a, n, Y, i_xy2, Y, i_xy1,  dtdy2 * sin_theta);
-
-    inc_a(a, n, X, i_xy1, X, i_xy2,  dtdx2 * cos_theta);
-    inc_a(a, n, X, i_xy1, Y, i_xy2,  dtdy2 * cos_theta);
-    inc_a(a, n, Y, i_xy1, X, i_xy2,  dtdx2 * sin_theta);
-    inc_a(a, n, Y, i_xy1, Y, i_xy2,  dtdy2 * sin_theta);
-
-    inc_a(a, n, X, i_xy1, X, i_xy1, -dtdx2 * cos_theta);
-    inc_a(a, n, X, i_xy1, Y, i_xy1, -dtdy2 * cos_theta);
-    inc_a(a, n, Y, i_xy1, X, i_xy1, -dtdx2 * sin_theta);
-    inc_a(a, n, Y, i_xy1, Y, i_xy1, -dtdy2 * sin_theta);
-
-    if (i_xy2 == 0) {
-        xy xy2 = wheel->rim[i_xy2], xy1 = wheel->rim[i_xy1];
-        double l0 = wheel->l_chord, l = length(sub(xy2, xy1));
-        ludebug(dbg, "Tension at hole %d (%.0f,%.0f) from rim chord at (%0.f,%0.f) extended %4.2f%% with modulus %.0f",
-                i_xy2, wheel->rim[i_xy2].x, wheel->rim[i_xy2].y, wheel->rim[i_xy1].x, wheel->rim[i_xy1].y, 100 * (l - l0) / l0, wheel->e_rim);
-        ludebug(dbg, "is %0.f with derivative (along chord) of %.0f dx %+.0f dy (cos %5.3f, sin %5.3f)",
-                t, dtdx2, dtdy2, cos_theta, sin_theta);
+    for (int i = 0; i < w->n_holes; ++i) {
+        *energy += w->e_spoke * d->spoke_extension[i] * d->spoke_extension[i] / 2;
+    }
+    for (int i = 0; i < w ->n_holes; ++i) {
+        *energy += w->e_rim * d->chord_compression[i] * d->chord_compression[i] / 2;
     }
 }
 
-int validate(int n, double *a, double *x, double *b) {
+void calculate_neg_force(data *d, gsl_vector *neg_force) {
+
+    wheel *w = d->wheel;
+    double force = 0;
+    gsl_vector_set_zero(neg_force);
+
+    for (int i = 0; i < w->n_holes; ++i) {
+        xy *spoke = &d->spoke[i];
+        double l = length(*spoke);
+        // there's a missing - sign because derivative is -force
+        double fx = w->e_spoke * d->spoke_extension[i] * spoke->x / l;
+        double fy = w->e_spoke * d->spoke_extension[i] * spoke->y / l;
+        gsl_vector_set(neg_force, 2*i+X, gsl_vector_get(neg_force, 2*i+X) + fx);
+        gsl_vector_set(neg_force, 2*i+Y, gsl_vector_get(neg_force, 2*i+Y) + fy);
+        ludebug(dbg, "Forces due to spoke %d: %g, %g", i, fx, fy);
+    }
+
+    for (int i = 0; i < w ->n_holes; ++i) {
+        xy *chord = &d->chord[i];
+        double l = length(*chord);
+        double fx = w->e_rim * d->chord_compression[i] * chord->x / l;
+        double fy = w->e_rim * d->chord_compression[i] * chord->y / l;
+        gsl_vector_set(neg_force, 2*i+X, gsl_vector_get(neg_force, 2*i+X) + fx);
+        gsl_vector_set(neg_force, 2*i+Y, gsl_vector_get(neg_force, 2*i+Y) + fy);
+        int j = (i - 1 + w->n_holes) % w->n_holes;
+        gsl_vector_set(neg_force, 2*j+X, gsl_vector_get(neg_force, 2*j+X) - fx);
+        gsl_vector_set(neg_force, 2*j+Y, gsl_vector_get(neg_force, 2*j+Y) - fy);
+        ludebug(dbg, "Forces due to chord %d: %g, %g", i, fx, fy);
+    }
+
+    for (int i = 0; i < w->n_holes; ++i) {
+        double fx = gsl_vector_get(neg_force, 2*i+X), fy = gsl_vector_get(neg_force, 2*i+Y);
+        force += sqrt(fx * fx + fy * fy);
+    }
+    ludebug(dbg, "Force: %g", force);
+}
+
+double energy(const gsl_vector *rim, void *params) {
+    data *d = (data*)params;
+    double energy;
+    calculate_data(rim, d);
+    calculate_energy(d, &energy);
+    ludebug(dbg, "Energy %g", energy);
+    return energy;
+}
+
+void neg_force(const gsl_vector *rim, void *params, gsl_vector *neg_force) {
+    data *d = (data*)params;
+    calculate_data(rim, d);
+    calculate_neg_force(d, neg_force);
+}
+
+void energy_and_neg_force(const gsl_vector *rim, void *params, double *energy, gsl_vector *neg_force) {
+    data *d = (data*)params;
+    calculate_data(rim, d);
+    calculate_energy(d, energy);
+    calculate_neg_force(d, neg_force);
+}
+
+int true(wheel *wheel) {
 
     LU_STATUS
+    const gsl_multimin_fdfminimizer_type *T;
+    gsl_vector *rim = NULL;
+    gsl_multimin_fdfminimizer *s = NULL;
+    gsl_multimin_function_fdf callbacks;
+    data *d = NULL;
+    int gsl_status = GSL_CONTINUE;
 
-    double *forces = NULL;
-    LU_CHECK(calculate_force(n, a, x, b, &forces))
-    for (int i = 0; i < n; ++i) {
-        luinfo(dbg, "%d: (%g, %g) (%g, %g)", i, forces[2*i+X], forces[2*i+Y], x[2*i+X], x[2*i+Y]);
+    LU_ALLOC(dbg, d, 1);
+    d->wheel = wheel;
+    LU_ALLOC(dbg, d->spoke, wheel->n_holes);
+    LU_ALLOC(dbg, d->spoke_extension, wheel->n_holes);
+    LU_ALLOC(dbg, d->chord, wheel->n_holes);
+    LU_ALLOC(dbg, d->chord_compression, wheel->n_holes);
+
+    callbacks.n = 2 * wheel->n_holes;
+    callbacks.params = d;
+    callbacks.f = energy;
+    callbacks.df = neg_force;
+    callbacks.fdf = energy_and_neg_force;
+
+    rim = gsl_vector_alloc(2 * wheel->n_holes);
+    for (int i = 0; i < wheel->n_holes; ++i) {
+        gsl_vector_set(rim, 2*i+X, wheel->rim[i].x);
+        gsl_vector_set(rim, 2*i+Y, wheel->rim[i].y);
     }
 
-LU_CLEANUP
-    free(forces);
-    LU_RETURN
-}
+    T = gsl_multimin_fdfminimizer_steepest_descent;
+//    T = gsl_multimin_fdfminimizer_conjugate_fr;
+    s = gsl_multimin_fdfminimizer_alloc(T, 2 * wheel->n_holes);
+    luinfo(dbg, "Method %s", gsl_multimin_fdfminimizer_name(s));
+    gsl_multimin_fdfminimizer_set(s, &callbacks, rim, 1e-4, 0.1);
 
-void calc_tension(xy xy1, xy xy2, double l0, double e,
-        double *t, double *dtdx2, double *dtdy2, double *cos_theta, double *sin_theta) {
-
-    // a line from x1,y1 to x2,y2 with length l makes an angle theta to
-    // the horizontal where theta = atan2((y2-y1)/(x2-x1)),
-    // cos(theta) = (x2-x1)/l and sin(theta) = (y2-y1)/l
-
-    double delta_x = xy2.x - xy1.x, delta_y = xy2.y - xy1.y;
-    double l = sqrt(delta_x * delta_x + delta_y * delta_y);
-    *cos_theta = delta_x / l; *sin_theta = delta_y / l;
-
-    // if xy2 moves by dx2, dy2 then the new length is approx (1st order)
-    // l + dx2 * cos(theta) + dy2 * sin(theta)
-    // this isn't obvious to me, but you can show it from the taylor expansion
-    // of l^2 = (delta_x+dx)^2 + (delta_y+dy)^2
-    // which gives
-    // l' = l + delta_x * (dx2-dx1) / l + delta_y * (dy2-dy1) / l
-
-    double dldx2 = delta_x / l, dldy2 = delta_y / l;
-
-    // now tension is E(l-l0)/l0 where l0 is the original length
-    // (tension is +ve when extended, ie when l > l0)
-
-    *t = e * (l - l0) / l0;
-
-    // the derivative of tension wrt dx and dy are then
-
-    *dtdx2 = e * dldx2 / l0; *dtdy2 = e * dldy2 / l0;
-}
-
-int true(wheel *wheel, double damping) {
-
-    LU_STATUS
-
-    double *a = NULL, *b = NULL, *a_copy = NULL, *b_copy = NULL;  // we're going to solve ax = b
-    int n = wheel->n_holes;
-    lapack_int *pivot;
-    double delta = 0.0;
-    double t, dtdx2, dtdy2, cos_theta, sin_theta;
-
-    ludebug(dbg, "e  spoke %g, rim %g", wheel->e_spoke, wheel->e_rim);
-    ludebug(dbg, "chord length %g", wheel->l_chord);
-
-    ludebug(dbg, "hub");
-    for (int i = 0; i < n; ++i) {
-        printf("%d  %g, %g\n", i, wheel->hub[i].x, wheel->hub[i].y);
-    }
-
-    ludebug(dbg, "rim");
-    for (int i = 0; i < n; ++i) {
-        printf("%d  %g, %g\n", i, wheel->rim[i].x, wheel->rim[i].y);
-    }
-
-    ludebug(dbg, "spokes");
-    for (int i = 0; i < n; ++i) {
-        double l = length(sub(wheel->hub[i], wheel->rim[wheel->hub_to_rim[i]]));
-        printf("%d  %g, %g  (diff %g, force %g)\n", i, l, wheel->l_spoke[i], l - wheel->l_spoke[i],
-                wheel->e_spoke * (l - wheel->l_spoke[i]) / wheel->l_spoke[i]);
-    }
-
-    ludebug(dbg, "chords");
-    for (int i = 0; i < n; ++i) {
-        int j = (i - 1 + wheel->n_holes) % wheel->n_holes;
-        double l = length(sub(wheel->rim[i], wheel->rim[j]));
-        printf("%d-%d  %g, %g  (diff %g, force %g)\n", j, i,
-                l, wheel->l_chord, wheel->l_chord - l,
-                wheel->e_rim * (wheel->l_chord - l) / wheel->l_chord);
-    }
-
-    // we interleave x,y and the arrays are column major so for hole i
-    // x[2i+X] = dx, x[2i+Y] = dy
-    // and the force on hole i in the x direction is the sum over forces from j
-    // sum(j)(a[2n*j+2i] * x[j]) - b[2i]
-
-    LU_ALLOC(dbg, a, 4 * n * n)
-    LU_ALLOC(dbg, b, 2 * n)
-    LU_ALLOC(dbg, pivot, 2 * n);
-
-    for (int i_rim = 0; i_rim < n; ++i_rim) {
-        // for spokes xy1 is fixed, so we only need the tension etc at xy2
-        int i_hub = wheel->rim_to_hub[i_rim];
-        calc_tension(wheel->hub[i_hub], wheel->rim[i_rim], wheel->l_spoke[i_hub], wheel->e_spoke,
-                &t, &dtdx2, &dtdy2, &cos_theta, &sin_theta);
-        inc_spoke(wheel, a, b, n, i_rim, t, dtdx2, dtdy2, cos_theta, sin_theta);
-    }
-
-    for (int i_xy2 = 0; i_xy2 < n; ++i_xy2) {
-        // for rims the chord from xy1 to xy2 affects two holes
-        int i_xy1 = (i_xy2-1+n) % n;
-        calc_tension(wheel->rim[i_xy1], wheel->rim[i_xy2], wheel->l_chord, wheel->e_rim,
-                &t, &dtdx2, &dtdy2, &cos_theta, &sin_theta);
-        inc_chord(wheel, a, b, n, i_xy1, i_xy2, t, dtdx2, dtdy2, cos_theta, sin_theta);
-    }
-
-    ludebug(dbg, "A");
-    for (int i = 0; i < 2 * n; ++i) {
-        printf("%d  ", i);
-        for (int j = 0; j < 2 * n; ++j) {
-            double value = a[i+2*n*j];
-            if (value) {
-                printf("%d %g  ", j, value);
-            }
+    for (int iter = 0; iter < 1000 && gsl_status == GSL_CONTINUE; ++iter) {
+        gsl_status = gsl_multimin_fdfminimizer_iterate(s);
+        if (gsl_status == GSL_ENOPROG) {
+            luwarn(dbg, "Cannot progress");
+        } else if (!gsl_status) {
+            gsl_status = gsl_multimin_test_gradient(s->gradient, 1e4);
+            if (gsl_status == GSL_SUCCESS) luinfo(dbg, "Minimum: %g", s->f);
         }
-        printf("\n");
     }
+    LU_ASSERT(gsl_status == GSL_SUCCESS, LU_ERR, dbg, "Equilibrium not found")
 
-    ludebug(dbg, "b");
-    for (int i = 0; i < n; ++i) {
-        printf("%d  %g, %g\n", i, b[2*i+X], b[2*i+Y]);
+    for (int i = 0; i < wheel->n_holes; ++i) {
+        wheel->rim[i].x = gsl_vector_get(rim, 2*i+X);
+        wheel->rim[i].y = gsl_vector_get(rim, 2*i+Y);
     }
-
-    double b_mag = 0;
-    for (int i = 0; i < 2 * n; ++i) b_mag += fabs(b[i]);
-    luinfo(dbg, "Total static force is %g", b_mag);
-
-    LU_ALLOC(dbg, a_copy, 4 * n * n);
-    memcpy(a_copy, a, 4 * n * n * sizeof(*a));
-    LU_ALLOC(dbg, b_copy, 2 * n);
-    memcpy(b_copy, b, 2 * n * sizeof(*b));
-
-    LU_CHECK(plot_forces_initial(wheel, a_copy, b_copy, "forces-initial.png"))
-    LU_CHECK(plot_forces_for_radial_movement(wheel, a_copy, b_copy, "forces-radial.png"))
-    LU_CHECK(plot_forces_for_tangential_movement(wheel, a_copy, b_copy, "forces-tangential.png"))
-
-    LA_CHECK(dbg, LAPACKE_dgetrf(LAPACK_COL_MAJOR, 2*n, 2*n, a, 2*n, pivot))
-    LA_CHECK(dbg, LAPACKE_dgetrs(LAPACK_COL_MAJOR, 'N', 2*n, 1, a, 2*n, pivot, b, 2*n))
-
-//    double ferr, berr;
-//    LA_CHECK(dbg, LAPACKE_dgerfs(LAPACK_COL_MAJOR, 'N', 2*n, 1, a_copy, 2*n, a, 2*n, pivot, b_copy, 2*n, b, 2*n,
-//            &ferr, &berr));
-//    luinfo(dbg, "Errors %g %g", ferr, berr);
-
-    ludebug(dbg, "x");
-    for (int i = 0; i < n; ++i) {
-        printf("%d  %g, %g\n", i, b[2*i+X], b[2*i+Y]);
-    }
-
-    LU_CHECK(plot_displacements(wheel, b, "displacements.png"))
-
-    for (int i = 0; i < n; ++i) {
-        delta += damping * sqrt(b[2*i+X]*b[2*i+X] + b[2*i+Y]*b[2*i+Y]);
-        wheel->rim[i].x += damping * b[2*i+X];
-        wheel->rim[i].y += damping * b[2*i+Y];
-    }
-    ludebug(dbg, "Total shift %7.2gmm", delta);
-
-    LU_CHECK(validate(n, a_copy, b, b_copy))
-
 
 LU_CLEANUP
-    free(a);
-    free(b);
-    free(pivot);
+    gsl_multimin_fdfminimizer_free(s);
+    gsl_vector_free(rim);
     LU_RETURN
 }
 
@@ -621,7 +364,6 @@ int make_wheel(int *offsets, int length, int holes, int padding, char type, whee
     (*wheel)->tension = 1000;  // 100 kgf = 1000 N
     (*wheel)->e_spoke = 200000 * 3;  // 200000 N/mm^2 for steel approx; 2mm diameter spoke
     (*wheel)->e_rim = 100 * (*wheel)->e_spoke;
-//    (*wheel)->l_chord *= 1.0001;
     LU_NO_CLEANUP
 }
 
@@ -649,12 +391,9 @@ int stress(const char *pattern) {
     LU_ASSERT(strchr("AB", type), LU_ERR, dbg, "Only symmetric types supported")
     LU_CHECK(dump_pattern(dbg, offsets, length));
     LU_CHECK(rim_size(dbg, length, &holes));
-    holes = 4;
     LU_CHECK(make_wheel(offsets, length, holes, padding, type, &wheel));
     LU_CHECK(lace(wheel));
-//    for (int i = 0; i < 100; ++i) LU_CHECK(true(wheel, 0.01));
-    LU_CHECK(true(wheel, 1));
-    LU_CHECK(true(wheel, 1));
+    LU_CHECK(true(wheel));
     LU_CHECK(make_path(dbg, pattern, &path));
     plot_wheel(wheel, path);
 
@@ -672,7 +411,6 @@ void usage(const char *progname) {
     luinfo(dbg, "(file name has commas removed)", progname);
 }
 
-// error handling is for lulib routines; don't bother elsewhere.
 int main(int argc, char** argv) {
 
     LU_STATUS
