@@ -8,6 +8,7 @@
 #include "gsl/gsl_multimin.h"
 #include "gsl/gsl_vector.h"
 #include "gsl/gsl_rng.h"
+#include "gsl/gsl_roots.h"
 
 #include "lu/status.h"
 #include "lu/log.h"
@@ -28,6 +29,13 @@ typedef struct {
     double x;
     double y;
 } xy;
+
+typedef struct {
+    double a11;
+    double a12;
+    double a21;
+    double a22;
+} m;
 
 typedef struct {
     char type;
@@ -55,6 +63,14 @@ typedef struct {
     xy start;
     xy end;
 } load;
+
+typedef struct {
+    int i_rim;
+    m *to_xy;
+    xy zero;
+    wheel *wheel;
+    load *load;
+} data;
 
 int make_wheel(int *offsets, int length, int holes, int padding, char type, wheel **wheel) {
     LU_STATUS
@@ -120,6 +136,10 @@ xy sub(xy a, xy b) {
 
 double dot(xy a, xy b) {
     return a.x * b.x + a.y * b.y;
+}
+
+double cross(xy a, xy b) {
+    return a.x * b.y - a.y * b.x;
 }
 
 double length(xy xy) {
@@ -233,23 +253,6 @@ double angle_to_rim(wheel *wheel, int i_hub) {
     return M_PI / 2 - psi + theta;
 }
 
-typedef struct {
-    wheel *wheel;
-    double *spoke_extn;
-    xy *spoke;
-    double *chord_extn;
-    xy *chord;
-    load *load;
-} data;
-
-void add_noise(wheel *w, double delta) {
-    for (int i = 0; i < w->n_holes; ++i) {
-        w->rim[i].x += delta * 2 * (gsl_rng_uniform(rng) - 0.5);
-        w->rim[i].y += delta * 2 * (gsl_rng_uniform(rng) - 0.5);
-    }
-    luinfo(dbg, "Added noise of %gmm", delta);
-}
-
 void calculate_data(const gsl_vector *rim, data *d) {
 
     wheel *w = d->wheel;
@@ -351,140 +354,112 @@ void calculate_neg_force(data *d, gsl_vector *neg_force) {
     ludebug(dbg, "Force: %g", force);
 }
 
-double energy(const gsl_vector *rim, void *params) {
+double f_vertical(double v, void *params) {
+
     data *d = (data*)params;
-    double energy;
-    calculate_data(rim, d);
-    calculate_energy(d, &energy);
-    ludebug(dbg, "Energy: %g", energy);
-    return energy;
+    wheel *w = d->wheel;
+
+    xy uv = {0, v};
+    xy rim = add(d->zero, mul(d->to_xy, uv));
+
+    return force(w, d->i_rim, rim);
 }
 
-void neg_force(const gsl_vector *rim, void *params, gsl_vector *neg_force) {
+double f_horizontal(double u, void *params) {
+
     data *d = (data*)params;
-    calculate_data(rim, d);
-    calculate_neg_force(d, neg_force);
+    wheel *w = d->wheel;
+
+    xy uv = {u, 0};
+    xy rim = add(d->zero, mul(d->to_xy, uv));
+
+    return force(w, d->i_rim, rim);
 }
 
-void energy_and_neg_force(const gsl_vector *rim, void *params, double *energy, gsl_vector *neg_force) {
-    data *d = (data*)params;
-    calculate_data(rim, d);
-    calculate_energy(d, energy);
-    calculate_neg_force(d, neg_force);
-}
+#define ITER_MAX 100
 
-#define FDF
+int relax_hole(wheel *w, int i_rim, double *force) {
+
+    LU_STATUS
+    gsl_function f;
+    gsl_root_fsolver *s = NULL;
+    data params;
+    LU_ASSERT(s = gsl_root_fsolver_alloc(gsl_root_fsolver_brent), LU_ERR, dbg, "Cannot create solver")
+
+    int i_before = (i_rim - 1 + w->n_holes) % w->n_holes;
+    int i_after = (i_rim + 1 + w->n_holes) % w->n_holes;
+    xy *before = w->rim[i_before], *after = w->rim[i_after];
+    xy u = norm(sub(*after, *before));     // x axis
+    xy v = {-u.y, u.x};                    // y axis, pointing away from hub
+    m to_uv = {u.x, u.y, v.x, v.y};
+    m to_xy = {v.y, -u.y, -v.x, u.x};      // inverse of to_uv
+    params.to_xy = &to_xy;
+
+    params->zero = *w->rim[i_rim];
+    xy q = sub(params->zero, *before);
+    double d = cross(u, q);                // v coord of hole above u axis
+    LU_ASSERT(d > 0, LU_ERR, dbg, "Rim inflected");
+
+    f.function = f_horizontal;
+    f.params = &params;
+    LU_ASSERT(!gsl_root_fsolver_set(s, f, -d, 0.1), LU_ERR, dbg, "Cannot set solver")
+
+    for (int iter = 0; iter < ITER_MAX; ++iter) {
+        LU_ASSERT(!gsl_root_fsolver_iterate(s), LU_ERR, dbg, "Solver failed");
+        double x_lo = gsl_root_fsolver_x_lower(s);
+        double x_hi = gsl_root_fsolver_x_upper(s);
+        ludebug(dbg, "Tangential: %d; %g - %g", iter, x_lo, x_hi);
+        int gsl_status = gsl_root_test_interval (x_lo, x_hi, 0, 0.001);
+        if (status == GSL_SUCCESS) break;
+        LU_ASSERT(!gsl_status, LU_ERR, dbg, "Test failed");
+    }
+    xy uv = {gsl_root_fsolver_root(s), 0};
+    params.zero = add(params.zero, mul(params.to_xy, uv));
+
+    f.function = f_vertical;
+    LU_ASSERT(!gsl_root_fsolver_set(s, f, -0.1, 0.1), LU_ERR, dbg, "Cannot set solver")
+
+    for (int iter = 0; iter < ITER_MAX; ++iter) {
+        LU_ASSERT(!gsl_root_fsolver_iterate(s), LU_ERR, dbg, "Solver failed");
+        double x_lo = gsl_root_fsolver_x_lower(s);
+        double x_hi = gsl_root_fsolver_x_upper(s);
+        ludebug(dbg, "Radial: %d; %g - %g", iter, x_lo, x_hi);
+        int gsl_status = gsl_root_test_interval (x_lo, x_hi, 0, 0.001);
+        if (status == GSL_SUCCESS) break;
+        LU_ASSERT(!gsl_status, LU_ERR, dbg, "Test failed");
+    }
+    double root = gsl_root_fsolver_root(s);
+    uv = (xy){0, gsl_root_fsolver_root(s)};
+    params.zero = add(params.zero, mul(params.to_xy, uv));
+
+    w->rim[params->i_rim] = params.zero;
+
+LU_CLEANUP
+    if (s) gsl_root_fsolver_free(s);
+    LU_RETURN
+}
 
 int relax(wheel *wheel, load *load) {
 
     LU_STATUS
-    gsl_vector *rim = NULL, *step = NULL;
-#ifdef FDF
-    const gsl_multimin_fdfminimizer_type *T;
-    gsl_multimin_fdfminimizer *s = NULL;
-    gsl_multimin_function_fdf callbacks;
-#else
-    const gsl_multimin_fminimizer_type *T;
-    gsl_multimin_fminimizer *s = NULL;
-    gsl_multimin_function callbacks;
-#endif
-    data *d = NULL;
-    int gsl_status = GSL_CONTINUE;
+    double force = 0;
+    data params;
+    int iter = 0;
 
-    LU_ALLOC(dbg, d, 1);
-    d->wheel = wheel;
-    d->load = load;
-    LU_ALLOC(dbg, d->spoke, wheel->n_holes);
-    LU_ALLOC(dbg, d->spoke_extn, wheel->n_holes);
-    LU_ALLOC(dbg, d->chord, wheel->n_holes);
-    LU_ALLOC(dbg, d->chord_extn, wheel->n_holes);
+    params.wheel = wheel;
+    params.load = load;
 
-    callbacks.n = 2 * wheel->n_holes;
-    callbacks.params = d;
-    callbacks.f = energy;
-#ifdef FDF
-    callbacks.df = neg_force;
-    callbacks.fdf = energy_and_neg_force;
-#endif
-
-    rim = gsl_vector_alloc(2 * wheel->n_holes);
-    for (int i = 0; i < wheel->n_holes; ++i) {
-        gsl_vector_set(rim, 2*i+X, wheel->rim[i].x);
-        gsl_vector_set(rim, 2*i+Y, wheel->rim[i].y);
-    }
-
-    double e = energy(rim, d);
-    luinfo(dbg, "Initial energy: %g", e);
-
-#ifdef FDF
-    T = gsl_multimin_fdfminimizer_steepest_descent;
-//    T = gsl_multimin_fdfminimizer_conjugate_fr;
-//    T = gsl_multimin_fdfminimizer_vector_bfgs2;
-    s = gsl_multimin_fdfminimizer_alloc(T, 2 * wheel->n_holes);
-    luinfo(dbg, "Method %s", gsl_multimin_fdfminimizer_name(s));
-    gsl_multimin_fdfminimizer_set(s, &callbacks, rim, 1e-4, 1e-3);
-#else
-    T = gsl_multimin_fminimizer_nmsimplex;
-    s = gsl_multimin_fminimizer_alloc(T, 2 * wheel->n_holes);
-    luinfo(dbg, "Method %s", gsl_multimin_fminimizer_name(s));
-    step = gsl_vector_alloc(2 * wheel->n_holes);
-    gsl_vector_set_all(step, 1e-4);
-    gsl_multimin_fminimizer_set(s, &callbacks, rim, step);
-#endif
-
-    for (int iter = 0; iter < 1000 && gsl_status == GSL_CONTINUE; ++iter) {
-        ludebug(dbg, "Iteration %d", iter);
-#ifdef FDF
-        gsl_status = gsl_multimin_fdfminimizer_iterate(s);
-#else
-        gsl_status = gsl_multimin_fminimizer_iterate(s);
-#endif
-        if (gsl_status == GSL_ENOPROG) {
-            luwarn(dbg, "Cannot progress");
-        // below not necessary - could consider restart
-//        } else if (!gsl_status && iter < 1) {
-//            ludebug(dbg, "Forcing new iteration");
-//            gsl_status = GSL_CONTINUE;
-        } else if (!gsl_status) {
-#ifdef FDF
-            gsl_status = gsl_multimin_test_gradient(s->gradient, 1e-4);
-            if (gsl_status == GSL_SUCCESS) luinfo(dbg, "Minimum energy: %g", s->f);
-#else
-            double size = gsl_multimin_fminimizer_size(s);
-            ludebug(dbg, "Size %g", size);
-            gsl_status = gsl_multimin_test_size(size, 1e-6);
-            if (gsl_status == GSL_SUCCESS) luinfo(dbg, "Minimum energy: %g", s->fval);
-#endif
+    do {
+        force = 0; iter++;
+        int start = gsl_rng_uniform_int(rng, wheel->n_holes);
+        for (int i = 0; i < wheel->n_holes; ++i) {
+            params.i_rim = (i + start) % wheel->n_holes;
+            LU_CHECK(relax_hole(&params, &force))
         }
-    }
-//    LU_ASSERT(gsl_status == GSL_SUCCESS, LU_ERR, dbg, "Equilibrium not found")
-
-    double shift = 0.0;
-    for (int i = 0; i < wheel->n_holes; ++i) {
-        double x = gsl_vector_get(s->x, 2*i+X), y = gsl_vector_get(s->x, 2*i+Y);
-        double dx = wheel->rim[i].x - x, dy = wheel->rim[i].y - y;
-        shift += sqrt(dx * dx + dy * dy);
-        wheel->rim[i].x = x;
-        wheel->rim[i].y = y;
-    }
-    shift = shift / wheel->n_holes;
-    ludebug(dbg, "Average shift %gmm", shift);
+        ludebug(dbg, "Iteration: %d; Force: %g", iter, force);
+    } while (force > 1);
 
 LU_CLEANUP
-#ifdef FDF
-    gsl_multimin_fdfminimizer_free(s);
-#else
-    gsl_multimin_fminimizer_free(s);
-    gsl_vector_free(step);
-#endif
-    gsl_vector_free(rim);
-    if (d) {
-        free(d->spoke);
-        free(d->spoke_extn);
-        free(d->chord);
-        free(d->chord_extn);
-        free(d);
-    }
     LU_RETURN
 }
 
