@@ -138,7 +138,7 @@ xy sub(xy a, xy b) {
 xy mul(m m, xy v) {
     xy c;
     c.x = m.a11 * v.x + m.a12 * v.y;
-    c.y = m.a21 * v.y + m.a22 * v.y;
+    c.y = m.a21 * v.x + m.a22 * v.y;
     return c;
 }
 
@@ -294,8 +294,12 @@ double f_vertical(double v, void *params) {
 
     xy uv = {0, v};
     xy rim = add(d->zero, mul(*d->to_xy, uv));
+//    ludebug(dbg, "Vertical %g: (%g,%g)", v, rim.x, rim.y);
 
-    return dot(d->resolve, force(w, d->i_rim, rim));
+    xy fxy = force(w, d->i_rim, rim);
+    double f = dot(d->resolve, fxy);
+//    ludebug(dbg, "Force (%g,%g) at %g: %g", fxy.x, fxy.y, v, f);
+    return f;
 }
 
 double f_horizontal(double u, void *params) {
@@ -305,13 +309,19 @@ double f_horizontal(double u, void *params) {
 
     xy uv = {u, 0};
     xy rim = add(d->zero, mul(*d->to_xy, uv));
+//    ludebug(dbg, "Horizontal %g: (%g,%g)", u, rim.x, rim.y);
 
-    return dot(d->resolve, force(w, d->i_rim, rim));
+    xy fxy = force(w, d->i_rim, rim);
+    double f = dot(d->resolve, fxy);
+//    ludebug(dbg, "Force (%g,%g) at %g: %g", fxy.x, fxy.y, u, f);
+    return f;
 }
 
 #define ITER_MAX 100
+#define EPSABS 1e-3
+#define EPSREL 1e-8
 
-int relax_hole(wheel *w, int i_rim, double *force) {
+int relax_hole(wheel *w, int i_rim, double delta) {
 
     LU_STATUS
     data params;
@@ -333,51 +343,72 @@ int relax_hole(wheel *w, int i_rim, double *force) {
 
     params.zero = w->rim[i_rim];
     params.resolve = u;
-    xy q = sub(params.zero, before);
-    double d = cross(u, q);                // v coord of hole above u axis
-    ludebug(dbg, "Distance from (%g,%g) to horizontal: %g", params.zero.x, params.zero.y, d);
-    LU_ASSERT(d > 0, LU_ERR, dbg, "Rim inflected");
 
     gsl_function f;
     f.function = f_horizontal;
     f.params = &params;
-    LU_ASSERT(!gsl_root_fsolver_set(s, &f, -d, 0.1), LU_ERR, dbg, "Cannot set solver")
+    LU_ASSERT(!gsl_root_fsolver_set(s, &f, -0.5, 0.5), LU_ERR, dbg, "Cannot set solver")
 
     for (int iter = 0; iter < ITER_MAX; ++iter) {
         LU_ASSERT(!gsl_root_fsolver_iterate(s), LU_ERR, dbg, "Solver failed");
         double x_lo = gsl_root_fsolver_x_lower(s);
         double x_hi = gsl_root_fsolver_x_upper(s);
-        ludebug(dbg, "Tangential: %d; %g - %g", iter, x_lo, x_hi);
-        int gsl_status = gsl_root_test_interval (x_lo, x_hi, 0, 0.001);
-        if (status == GSL_SUCCESS) break;
-        LU_ASSERT(!gsl_status, LU_ERR, dbg, "Test failed");
+        double x = gsl_root_fsolver_root(s);
+//        ludebug(dbg, "Tangential: %d; %g (%g - %g)", iter, x, x_lo, x_hi);
+//        int gsl_status = gsl_root_test_interval(x_lo, x_hi, EPSABS, EPSREL);
+        double residual = f.function(x, f.params);
+        int gsl_status = gsl_root_test_residual(residual, EPSABS);
+        if (gsl_status == GSL_SUCCESS) {ludebug(dbg, "Horizontal residual: %g", residual); break;}
+        LU_ASSERT(gsl_status == GSL_CONTINUE, LU_ERR, dbg, "Test failed");
     }
     xy uv = {gsl_root_fsolver_root(s), 0};
+    luinfo(dbg, "Tangential: %g", uv.x);
     params.zero = add(params.zero, mul(*params.to_xy, uv));
 
+    xy q = sub(params.zero, before);
+    double d = cross(u, q);                // v coord of hole above u axis
+    ludebug(dbg, "Distance from (%g,%g) to horizontal: %g", params.zero.x, params.zero.y, d);
+    LU_ASSERT(d > 0, LU_ERR, dbg, "Rim inflected");
     params.resolve = v;
     f.function = f_vertical;
-    LU_ASSERT(!gsl_root_fsolver_set(s, &f, -0.1, 0.1), LU_ERR, dbg, "Cannot set solver")
+    LU_ASSERT(!gsl_root_fsolver_set(s, &f, -d, 0.5), LU_ERR, dbg, "Cannot set solver")
 
     for (int iter = 0; iter < ITER_MAX; ++iter) {
         LU_ASSERT(!gsl_root_fsolver_iterate(s), LU_ERR, dbg, "Solver failed");
         double x_lo = gsl_root_fsolver_x_lower(s);
         double x_hi = gsl_root_fsolver_x_upper(s);
-        ludebug(dbg, "Radial: %d; %g - %g", iter, x_lo, x_hi);
-        int gsl_status = gsl_root_test_interval (x_lo, x_hi, 0, 0.001);
-        if (status == GSL_SUCCESS) break;
-        LU_ASSERT(!gsl_status, LU_ERR, dbg, "Test failed");
+        double x = gsl_root_fsolver_root(s);
+//        ludebug(dbg, "Radial: %d; %g (%g - %g)", iter, x, x_lo, x_hi);
+//        int gsl_status = gsl_root_test_interval (x_lo, x_hi, EPSABS, EPSREL);
+        double residual = f.function(x, f.params);
+        int gsl_status = gsl_root_test_residual(residual, EPSABS);
+        if (gsl_status == GSL_SUCCESS) {ludebug(dbg, "Vertical residual: %g", residual); break;}
+        LU_ASSERT(gsl_status == GSL_CONTINUE, LU_ERR, dbg, "Test failed");
     }
     double root = gsl_root_fsolver_root(s);
     uv = (xy){0, gsl_root_fsolver_root(s)};
+    luinfo(dbg, "Radial: %g", uv.y);
     params.zero = add(params.zero, mul(*params.to_xy, uv));
 
-    w->rim[params.i_rim] = params.zero;
-    // increment force
+    xy full = sub(params.zero, w->rim[params.i_rim]);
+    xy frac = scalar_mult(delta, full);
+    ludebug(dbg, "Shift: (%g,%g) (Delta: %g)", frac.x, frac.y, delta);
+    w->rim[params.i_rim] = add(w->rim[params.i_rim], frac);
 
 LU_CLEANUP
     if (s) gsl_root_fsolver_free(s);
     LU_RETURN
+}
+
+float residual(wheel *wheel) {
+    double residual = 0;
+    for (int i = 0; i < wheel->n_holes; ++i) {
+        xy f = force(wheel, i, wheel->rim[i]);
+        double delta = length(f);
+        ludebug(dbg, "Force at %d: %g", i, delta);
+        residual += delta;
+    }
+    return residual;
 }
 
 int relax(wheel *wheel, load *load) {
@@ -392,10 +423,11 @@ int relax(wheel *wheel, load *load) {
         for (int i = 0; i < wheel->n_holes; ++i) {
             int i_rim = (i + start) % wheel->n_holes;
             ludebug(dbg, "Relaxing hole %d at (%g,%g)", i_rim, wheel->rim[i_rim].x, wheel->rim[i_rim].y);
-            LU_CHECK(relax_hole(wheel, i_rim, &force))
+            LU_CHECK(relax_hole(wheel, i_rim, 1 - pow(0.9, iter)))
         }
-        ludebug(dbg, "Iteration: %d; Force: %g", iter, force);
-    } while (force > 1);
+        force = residual(wheel);
+        ludebug(dbg, "Iteration: %d; Residual: %g", iter, force);
+    } while (force > 10);
 
 LU_CLEANUP
     LU_RETURN
