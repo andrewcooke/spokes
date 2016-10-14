@@ -323,8 +323,10 @@ int relax_hole(wheel *w, int i_rim, double *force) {
     int i_before = (i_rim - 1 + w->n_holes) % w->n_holes;
     int i_after = (i_rim + 1 + w->n_holes) % w->n_holes;
     xy before = w->rim[i_before], after = w->rim[i_after];
-    xy u = norm(sub(after, before));     // x axis
+    ludebug(dbg, "Before: (%g,%g); After: (%g,%g)", before.x, before.y, after.x, after.y);
+    xy u = norm(sub(after, before));       // x axis
     xy v = {-u.y, u.x};                    // y axis, pointing away from hub
+    ludebug(dbg, "X axis: (%g,%g); Y axis: (%g,%g)", u.x, u.y, v.x, v.y);
     m to_uv = {u.x, u.y, v.x, v.y};
     m to_xy = {v.y, -u.y, -v.x, u.x};      // inverse of to_uv
     params.to_xy = &to_xy;
@@ -333,6 +335,7 @@ int relax_hole(wheel *w, int i_rim, double *force) {
     params.resolve = u;
     xy q = sub(params.zero, before);
     double d = cross(u, q);                // v coord of hole above u axis
+    ludebug(dbg, "Distance from (%g,%g) to horizontal: %g", params.zero.x, params.zero.y, d);
     LU_ASSERT(d > 0, LU_ERR, dbg, "Rim inflected");
 
     gsl_function f;
@@ -388,6 +391,7 @@ int relax(wheel *wheel, load *load) {
         int start = gsl_rng_uniform_int(rng, wheel->n_holes);
         for (int i = 0; i < wheel->n_holes; ++i) {
             int i_rim = (i + start) % wheel->n_holes;
+            ludebug(dbg, "Relaxing hole %d at (%g,%g)", i_rim, wheel->rim[i_rim].x, wheel->rim[i_rim].y);
             LU_CHECK(relax_hole(wheel, i_rim, &force))
         }
         ludebug(dbg, "Iteration: %d; Force: %g", iter, force);
