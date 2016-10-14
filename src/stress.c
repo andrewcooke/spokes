@@ -67,6 +67,7 @@ typedef struct {
 typedef struct {
     int i_rim;
     m *to_xy;
+    xy resolve;
     xy zero;
     wheel *wheel;
     load *load;
@@ -131,6 +132,13 @@ xy sub(xy a, xy b) {
     xy c;
     c.x = a.x - b.x;
     c.y = a.y - b.y;
+    return c;
+}
+
+xy mul(m m, xy v) {
+    xy c;
+    c.x = m.a11 * v.x + m.a12 * v.y;
+    c.y = m.a21 * v.y + m.a22 * v.y;
     return c;
 }
 
@@ -253,105 +261,30 @@ double angle_to_rim(wheel *wheel, int i_hub) {
     return M_PI / 2 - psi + theta;
 }
 
-void calculate_data(const gsl_vector *rim, data *d) {
+xy force(wheel *w, int i_rim, xy rim) {
 
-    wheel *w = d->wheel;
+    int i_before = (i_rim - 1 + w->n_holes) % w->n_holes;
+    int i_after = (i_rim + 1 + w->n_holes) % w->n_holes;
+    int i_hub = w->rim_to_hub[i_rim];
 
-    memset(d->spoke_extn, 0, w->n_holes * sizeof(*d->spoke_extn));
-    memset(d->spoke, 0, w->n_holes * sizeof(*d->spoke));
-    memset(d->chord_extn, 0, w->n_holes * sizeof(*d->chord_extn));
-    memset(d->chord, 0, w->n_holes * sizeof(*d->chord));
+    xy spoke = sub(rim, w->hub[i_hub]);
+    double l = length(spoke);
+    double l0 = w->l_spoke[i_hub];
+    xy f = {-w->e_spoke * (l - l0) * spoke.x / (l * l0), -w->e_spoke * (l - l0) * spoke.y / (l * l0)};
 
-    for (int i = 0; i < w->n_holes; ++i) {
-        xy *hub = &w->hub[w->rim_to_hub[i]];
-        xy *spoke = &d->spoke[i];
-        spoke->x = gsl_vector_get(rim, 2*i+X) - hub->x;
-        spoke->y = gsl_vector_get(rim, 2*i+Y) - hub->y;
-        d->spoke_extn[i] = length(*spoke) - w->l_spoke[w->rim_to_hub[i]];
-//        ludebug(dbg, "Spoke %d extended by %gmm", i, d->spoke_extn[i]);
-    }
+    xy chord = sub(rim, w->rim[i_before]);
+    l = length(chord);
+    l0 = w->l_chord;
+    f.x -= w->e_rim * (l - l0) * chord.x / (l * l0);
+    f.y -= w->e_rim * (l - l0) * chord.y / (l * l0);
 
-    for (int after = 0; after < w ->n_holes; ++after) {
-        int before = (after - 1 + w->n_holes) % w->n_holes;
-        xy *chord = &d->chord[after];
-        chord->x = gsl_vector_get(rim, 2*after+X) - gsl_vector_get(rim, 2*before+X);
-        chord->y = gsl_vector_get(rim, 2*after+Y) - gsl_vector_get(rim, 2*before+Y);
-        d->chord_extn[after] = length(*chord) - w->l_chord;
-//        ludebug(dbg, "Chord %d extended by %gmm", after, d->chord_extn[after]);
-    }
+    chord = sub(rim, w->rim[i_after]);
+    l = length(chord);
+    l0 = w->l_chord;
+    f.x -= w->e_rim * (l - l0) * chord.x / (l * l0);
+    f.y -= w->e_rim * (l - l0) * chord.y / (l * l0);
 
-    if (d->load) {
-        d->load->end.x = gsl_vector_get(rim, 2*d->load->i_rim+X);
-        d->load->end.y = gsl_vector_get(rim, 2*d->load->i_rim+Y);
-    }
-}
-
-void calculate_energy(data *d, double *energy) {
-
-    wheel *w = d->wheel;
-    load *l = d->load;
-    *energy = 0;
-
-    for (int i = 0; i < w->n_holes; ++i) {
-        double extn = d->spoke_extn[i];
-        // 1e-3 since mm
-        *energy += 1e-3 * w->e_spoke * extn * extn / (2 * w->l_spoke[w->rim_to_hub[i]]);
-    }
-    for (int i = 0; i < w ->n_holes; ++i) {
-        double extn = d->chord_extn[i];
-        *energy += 1e-3 * w->e_rim * extn * extn / (2 * w->l_chord);
-    }
-    if (l) {
-        xy disp = sub(l->end, l->start);
-        double s = dot(disp, l->g_norm);
-        ludebug(dbg, "Load moved by %gmm (%g,%g)", s, disp.x, disp.y);
-        *energy -= s * l->mass * G * 1e-3;  // mm -> m
-    }
-}
-
-void calculate_neg_force(data *d, gsl_vector *neg_force) {
-
-    wheel *w = d->wheel;
-    load *l = d->load;
-    double force = 0;
-    gsl_vector_set_zero(neg_force);
-
-    for (int i = 0; i < w->n_holes; ++i) {
-        xy *spoke = &d->spoke[i];
-        double l = length(*spoke);
-        double l0 = w->l_spoke[w->rim_to_hub[i]];
-        // there's a missing - sign because derivative is -force
-        double fx = w->e_spoke * d->spoke_extn[i] * spoke->x / (l * l0);
-        double fy = w->e_spoke * d->spoke_extn[i] * spoke->y / (l * l0);
-        gsl_vector_set(neg_force, 2*i+X, gsl_vector_get(neg_force, 2*i+X) + fx);
-        gsl_vector_set(neg_force, 2*i+Y, gsl_vector_get(neg_force, 2*i+Y) + fy);
-//        ludebug(dbg, "Forces due to spoke %d: %g, %g", i, fx, fy);
-    }
-
-    for (int i = 0; i < w ->n_holes; ++i) {
-        xy *chord = &d->chord[i];
-        double l = length(*chord);
-        double l0 = w->l_chord;
-        double fx = w->e_rim * d->chord_extn[i] * chord->x / (l * l0);
-        double fy = w->e_rim * d->chord_extn[i] * chord->y / (l * l0);
-        gsl_vector_set(neg_force, 2*i+X, gsl_vector_get(neg_force, 2*i+X) + fx);
-        gsl_vector_set(neg_force, 2*i+Y, gsl_vector_get(neg_force, 2*i+Y) + fy);
-        int j = (i - 1 + w->n_holes) % w->n_holes;
-        gsl_vector_set(neg_force, 2*j+X, gsl_vector_get(neg_force, 2*j+X) - fx);
-        gsl_vector_set(neg_force, 2*j+Y, gsl_vector_get(neg_force, 2*j+Y) - fy);
-//        ludebug(dbg, "Forces due to chord %d: %g, %g", i, fx, fy);
-    }
-
-    if (l) {
-        gsl_vector_set(neg_force, 2*l->i_rim+X, gsl_vector_get(neg_force, 2*l->i_rim+X) - l->mass * G * l->g_norm.x);
-        gsl_vector_set(neg_force, 2*l->i_rim+Y, gsl_vector_get(neg_force, 2*l->i_rim+Y) - l->mass * G * l->g_norm.y);
-    }
-
-    for (int i = 0; i < w->n_holes; ++i) {
-        double fx = gsl_vector_get(neg_force, 2*i+X), fy = gsl_vector_get(neg_force, 2*i+Y);
-        force += sqrt(fx * fx + fy * fy);
-    }
-    ludebug(dbg, "Force: %g", force);
+    return f;
 }
 
 double f_vertical(double v, void *params) {
@@ -360,9 +293,9 @@ double f_vertical(double v, void *params) {
     wheel *w = d->wheel;
 
     xy uv = {0, v};
-    xy rim = add(d->zero, mul(d->to_xy, uv));
+    xy rim = add(d->zero, mul(*d->to_xy, uv));
 
-    return force(w, d->i_rim, rim);
+    return dot(d->resolve, force(w, d->i_rim, rim));
 }
 
 double f_horizontal(double u, void *params) {
@@ -371,9 +304,9 @@ double f_horizontal(double u, void *params) {
     wheel *w = d->wheel;
 
     xy uv = {u, 0};
-    xy rim = add(d->zero, mul(d->to_xy, uv));
+    xy rim = add(d->zero, mul(*d->to_xy, uv));
 
-    return force(w, d->i_rim, rim);
+    return dot(d->resolve, force(w, d->i_rim, rim));
 }
 
 #define ITER_MAX 100
@@ -381,28 +314,31 @@ double f_horizontal(double u, void *params) {
 int relax_hole(wheel *w, int i_rim, double *force) {
 
     LU_STATUS
-    gsl_function f;
-    gsl_root_fsolver *s = NULL;
     data params;
+    params.i_rim = i_rim;
+    params.wheel = w;
+    gsl_root_fsolver *s = NULL;
     LU_ASSERT(s = gsl_root_fsolver_alloc(gsl_root_fsolver_brent), LU_ERR, dbg, "Cannot create solver")
 
     int i_before = (i_rim - 1 + w->n_holes) % w->n_holes;
     int i_after = (i_rim + 1 + w->n_holes) % w->n_holes;
-    xy *before = w->rim[i_before], *after = w->rim[i_after];
-    xy u = norm(sub(*after, *before));     // x axis
+    xy before = w->rim[i_before], after = w->rim[i_after];
+    xy u = norm(sub(after, before));     // x axis
     xy v = {-u.y, u.x};                    // y axis, pointing away from hub
     m to_uv = {u.x, u.y, v.x, v.y};
     m to_xy = {v.y, -u.y, -v.x, u.x};      // inverse of to_uv
     params.to_xy = &to_xy;
 
-    params->zero = *w->rim[i_rim];
-    xy q = sub(params->zero, *before);
+    params.zero = w->rim[i_rim];
+    params.resolve = u;
+    xy q = sub(params.zero, before);
     double d = cross(u, q);                // v coord of hole above u axis
     LU_ASSERT(d > 0, LU_ERR, dbg, "Rim inflected");
 
+    gsl_function f;
     f.function = f_horizontal;
     f.params = &params;
-    LU_ASSERT(!gsl_root_fsolver_set(s, f, -d, 0.1), LU_ERR, dbg, "Cannot set solver")
+    LU_ASSERT(!gsl_root_fsolver_set(s, &f, -d, 0.1), LU_ERR, dbg, "Cannot set solver")
 
     for (int iter = 0; iter < ITER_MAX; ++iter) {
         LU_ASSERT(!gsl_root_fsolver_iterate(s), LU_ERR, dbg, "Solver failed");
@@ -414,10 +350,11 @@ int relax_hole(wheel *w, int i_rim, double *force) {
         LU_ASSERT(!gsl_status, LU_ERR, dbg, "Test failed");
     }
     xy uv = {gsl_root_fsolver_root(s), 0};
-    params.zero = add(params.zero, mul(params.to_xy, uv));
+    params.zero = add(params.zero, mul(*params.to_xy, uv));
 
+    params.resolve = v;
     f.function = f_vertical;
-    LU_ASSERT(!gsl_root_fsolver_set(s, f, -0.1, 0.1), LU_ERR, dbg, "Cannot set solver")
+    LU_ASSERT(!gsl_root_fsolver_set(s, &f, -0.1, 0.1), LU_ERR, dbg, "Cannot set solver")
 
     for (int iter = 0; iter < ITER_MAX; ++iter) {
         LU_ASSERT(!gsl_root_fsolver_iterate(s), LU_ERR, dbg, "Solver failed");
@@ -430,9 +367,10 @@ int relax_hole(wheel *w, int i_rim, double *force) {
     }
     double root = gsl_root_fsolver_root(s);
     uv = (xy){0, gsl_root_fsolver_root(s)};
-    params.zero = add(params.zero, mul(params.to_xy, uv));
+    params.zero = add(params.zero, mul(*params.to_xy, uv));
 
-    w->rim[params->i_rim] = params.zero;
+    w->rim[params.i_rim] = params.zero;
+    // increment force
 
 LU_CLEANUP
     if (s) gsl_root_fsolver_free(s);
@@ -443,18 +381,14 @@ int relax(wheel *wheel, load *load) {
 
     LU_STATUS
     double force = 0;
-    data params;
     int iter = 0;
-
-    params.wheel = wheel;
-    params.load = load;
 
     do {
         force = 0; iter++;
         int start = gsl_rng_uniform_int(rng, wheel->n_holes);
         for (int i = 0; i < wheel->n_holes; ++i) {
-            params.i_rim = (i + start) % wheel->n_holes;
-            LU_CHECK(relax_hole(&params, &force))
+            int i_rim = (i + start) % wheel->n_holes;
+            LU_CHECK(relax_hole(wheel, i_rim, &force))
         }
         ludebug(dbg, "Iteration: %d; Force: %g", iter, force);
     } while (force > 1);
@@ -471,7 +405,6 @@ int true(wheel *w) {
 
     LU_STATUS
 
-    add_noise(w, 1e-4);
     LU_CHECK(relax(w, NULL))
 
     while(1) {
@@ -568,8 +501,6 @@ int deform(wheel *wheel) {
     l->g_norm.y = 0;
     l->i_rim = 4;
     l->start = wheel->rim[l->i_rim];
-
-    add_noise(wheel, 1e-5);
 
     for (int i = -3; i < 2; ++i) {
         l->mass = pow(10, i+1);
