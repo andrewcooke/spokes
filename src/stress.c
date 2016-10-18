@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <signal.h>
+#include <unistd.h>
 
 #include "cairo/cairo.h"
 #include "gsl/gsl_multimin.h"
@@ -365,7 +366,7 @@ int relax_hole(wheel *w, load *load, int i_rim, double delta, int verbose) {
     f.params = &params;
     LU_ASSERT(!gsl_root_fsolver_set(s, &f, lo, hi), LU_ERR, dbg, "Cannot set solver")
 
-    for (int iter = 0; iter < ITER_MAX; ++iter) {
+    for (int iter = 0; iter < ITER_MAX && !sig_exit; ++iter) {
         LU_ASSERT(!gsl_root_fsolver_iterate(s), LU_ERR, dbg, "Solver failed");
         double x_lo = gsl_root_fsolver_x_lower(s);
         double x_hi = gsl_root_fsolver_x_upper(s);
@@ -426,7 +427,7 @@ int relax(wheel *wheel, load *load, double step, double damp, int verbose) {
         }
         force = residual(wheel, load);
         if (sig_exit || force <= 10 || iter < 100 || iter % 1000 == 0) luinfo(dbg, "Iteration: %d; Residual: %g", iter, force);
-    } while (sig_exit || force > 10);
+    } while (!sig_exit && force > 10);
     if (sig_exit) luwarn(dbg, "SIGINT aborted relax");
 
 LU_CLEANUP
@@ -542,8 +543,8 @@ int deform(wheel *wheel) {
 //        luinfo(dbg,"Mass %gkg", l->mass);
 //        LU_CHECK(relax(wheel, l))
 //    }
-    l->mass = 20;
-    LU_CHECK(relax(wheel, l, 0.1, 0.99, 0))
+    l->mass = 100;
+    LU_CHECK(relax(wheel, l, 0.5, 0.99, 0))
 
 LU_CLEANUP
     free(l);
@@ -582,15 +583,13 @@ LU_CLEANUP
 }
 
 void new_handler(int sig) {
-//    luwarn(dbg, "Handler called with %d", sig);
+    luwarn(dbg, "Handler called with %d", sig);
     sig_exit = 1;
 }
 
 int set_handler() {
     LU_STATUS
-    struct sigaction action = {0};
-    action.sa_handler = new_handler;
-    LU_ASSERT(!sigaction(SIGINT, &action, NULL), LU_ERR, dbg, "Could not set handler")
+    LU_ASSERT(!signal(SIGINT, &new_handler), LU_ERR, dbg, "Could not set handler")
     luinfo(dbg, "Handler set");
     LU_NO_CLEANUP
 }
@@ -611,8 +610,6 @@ int main(int argc, char** argv) {
         usage(argv[0]);
     } else {
         LU_CHECK(set_handler())
-        while (!sig_exit) sleep(1);
-//        gsl_set_error_handler_off();
         LU_ASSERT(rng = gsl_rng_alloc(gsl_rng_mt19937), LU_ERR, dbg, "Could not create PRNG")
         LU_CHECK(stress(argv[1]));
     }
