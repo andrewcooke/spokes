@@ -318,6 +318,7 @@ double f_descent(double x, void *params) {
 
     xy fxy = force(w, d->i_rim, rim, d->load);
     double f = dot(d->descent, fxy);
+//    double f = length(fxy);
 //    ludebug(dbg, "Force (%g,%g) at %g: %g", fxy.x, fxy.y, x, f);
     return f;
 }
@@ -326,7 +327,7 @@ double f_descent(double x, void *params) {
 #define EPSABS 1e-3
 #define EPSREL 1e-8
 
-int relax_hole(wheel *w, load *load, int i_rim, double delta, int verbose) {
+int relax_hole(wheel *w, xy *rim, load *load, int i_rim, double delta, int verbose) {
 
     LU_STATUS
 
@@ -372,7 +373,6 @@ int relax_hole(wheel *w, load *load, int i_rim, double delta, int verbose) {
         double x_hi = gsl_root_fsolver_x_upper(s);
         double x = gsl_root_fsolver_root(s);
         if (verbose) ludebug(dbg, "Descent: %d; %g (%g - %g)", iter, x, x_lo, x_hi);
-//        int gsl_status = gsl_root_test_interval(x_lo, x_hi, EPSABS, EPSREL);
         double residual = f.function(x, f.params);
         int gsl_status = gsl_root_test_residual(residual, EPSABS);
         if (gsl_status == GSL_SUCCESS) break;
@@ -386,10 +386,10 @@ int relax_hole(wheel *w, load *load, int i_rim, double delta, int verbose) {
 
     xy full = sub(end, params.zero);
     xy frac = scalar_mult(delta, full);
-    w->rim[params.i_rim] = add(w->rim[params.i_rim], frac);
+    rim[params.i_rim] = add(w->rim[params.i_rim], frac);
     if (verbose) {
         luinfo(dbg, "Shift: (%g,%g) (Delta: %g) to (%g,%g)",
-                frac.x, frac.y, delta, w->rim[params.i_rim].x, w->rim[params.i_rim].y);
+                frac.x, frac.y, delta, rim[params.i_rim].x, rim[params.i_rim].y);
     }
 
 LU_CLEANUP
@@ -414,23 +414,25 @@ int relax(wheel *wheel, load *load, double step, double damp, int verbose) {
     LU_STATUS
     double force = 0;
     int iter = 0;
+    xy *new_rim = NULL;
+
+    LU_ALLOC(dbg, new_rim, wheel->n_holes);
 
     do {
         force = 0; iter++;
-        int start = gsl_rng_uniform_int(rng, wheel->n_holes);
         int sign = (2 * gsl_rng_uniform_int(rng, 2)) - 1;
-        if (iter == 1 && load) start = load->i_rim;
-        for (int i = 0; i < wheel->n_holes; ++i) {
-            int i_rim = (sign * i + start + 2 * wheel->n_holes) % wheel->n_holes;
+        for (int i_rim = 0; i_rim < wheel->n_holes; ++i_rim) {
 //            ludebug(dbg, "Relaxing hole %d at (%g,%g)", i_rim, wheel->rim[i_rim].x, wheel->rim[i_rim].y);
-            LU_CHECK(relax_hole(wheel, load, i_rim, step * (1 - pow(damp, iter)), verbose))
+            LU_CHECK(relax_hole(wheel, new_rim, load, i_rim, step * (1 - pow(damp, iter)), verbose))
         }
+        for (int i = 0; i < wheel->n_holes; ++i) wheel->rim[i] = new_rim[i];
         force = residual(wheel, load);
-        if (sig_exit || force <= 10 || iter < 100 || iter % 1000 == 0) luinfo(dbg, "Iteration: %d; Residual: %g", iter, force);
+        if (sig_exit || force <= 10 || !(iter & (iter - 1))) luinfo(dbg, "Iteration: %d; Residual: %g", iter, force);
     } while (!sig_exit && force > 10);
     if (sig_exit) luwarn(dbg, "SIGINT aborted relax");
 
 LU_CLEANUP
+    free(new_rim);
     LU_RETURN
 }
 
@@ -538,13 +540,11 @@ int deform(wheel *wheel) {
     l->g_norm.y = -1;
     l->i_rim = 0;
 
-//    for (int i = 0; i < 10; ++i) {
-//        l->mass = 10 * (i+1);
-//        luinfo(dbg,"Mass %gkg", l->mass);
-//        LU_CHECK(relax(wheel, l))
-//    }
-    l->mass = 100;
-    LU_CHECK(relax(wheel, l, 0.5, 0.99, 0))
+    for (int i = 0; i < 100; ++i) {
+        l->mass = i + 1;
+        luinfo(dbg,"Mass %gkg", l->mass);
+        LU_CHECK(relax(wheel, l, 0.5, 0.99, 0))
+    }
 
 LU_CLEANUP
     free(l);
