@@ -336,8 +336,9 @@ int relax_hole(wheel *w, xy *rim, load *load, int i_rim, double delta, int verbo
     params.i_rim = i_rim;
     params.wheel = w;
     params.zero = w->rim[i_rim];
+    xy f_start = force(w, i_rim, params.zero, load);
     // steepest descent direction is the direction of the force
-    params.descent = norm(force(w, i_rim, params.zero, load));
+    params.descent = norm(f_start);
     if (verbose) {
         ludebug(dbg, "Relaxing at %d (%g,%g) along (%g,%g)",
                 i_rim, params.zero.x, params.zero.y, params.descent.x, params.descent.y);
@@ -386,10 +387,17 @@ int relax_hole(wheel *w, xy *rim, load *load, int i_rim, double delta, int verbo
 
     xy full = sub(end, params.zero);
     xy frac = scalar_mult(delta, full);
-    rim[params.i_rim] = add(w->rim[params.i_rim], frac);
-    if (verbose) {
-        luinfo(dbg, "Shift: (%g,%g) (Delta: %g) to (%g,%g)",
-                frac.x, frac.y, delta, rim[params.i_rim].x, rim[params.i_rim].y);
+    xy mid = add(w->rim[params.i_rim], frac);
+    xy f_mid = force(w, i_rim, mid, load);
+    if (length(f_mid) < length(f_start)) {
+        if (verbose) {
+            luinfo(dbg, "Shift: (%g,%g) (Delta: %g) to (%g,%g)",
+                    frac.x, frac.y, delta, rim[params.i_rim].x, rim[params.i_rim].y);
+        }
+        rim[params.i_rim] = mid;
+    } else {
+//        luwarn(dbg, "No gain");
+        rim[params.i_rim] = params.zero;
     }
 
 LU_CLEANUP
