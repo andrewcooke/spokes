@@ -7,10 +7,9 @@
 #include <unistd.h>
 
 #include "cairo/cairo.h"
-#include "gsl/gsl_multimin.h"
 #include "gsl/gsl_vector.h"
 #include "gsl/gsl_rng.h"
-#include "gsl/gsl_roots.h"
+#include "gsl/gsl_min.h"
 
 #include "lu/status.h"
 #include "lu/log.h"
@@ -27,7 +26,7 @@ volatile int sig_exit = 0;
 #define Y 1
 #define G 9.8
 
-#define ZOOM 100
+#define ZOOM 200
 
 typedef struct {
     double x;
@@ -218,23 +217,23 @@ void plot_wheel(wheel *wheel, const char *path) {
     close_plot(cr, surface, path);
 }
 
-xy zoom(xy a, xy b, double r_scale, double t_scale) {
+xy zoom(xy a, xy b, double r_scale) {
     xy d = sub(b, a);
     double r = sqrt(d.x * d.x + d.y * d.y), theta = atan2(d.y, d.x);
-    r *= r_scale; theta *= t_scale;
+    r *= r_scale;
     d.x = r * cos(theta); d.y = r * sin(theta);
     return add(a, d);
 }
 
-void draw_deform(cairo_t *cr, wheel *a, wheel *b, double r_scale, double t_scale) {
+void draw_deform(cairo_t *cr, wheel *a, wheel *b, double r_scale) {
     for (int i = 0; i < a->n_holes; ++i) {
         int j = a->hub_to_rim[i];
         xy hub_a = a->hub[i], hub_b = b->hub[i];
         xy rim1_a = a->rim[j], rim1_b = b->rim[j];
         int k = (j + 1) % a->n_holes;
         xy rim2_a = a->rim[k], rim2_b = b->rim[k];
-        draw_line_xy(cr, zoom(hub_a, hub_b, r_scale, t_scale), zoom(rim1_a, rim1_b, r_scale, t_scale));
-        draw_line_xy(cr, zoom(rim1_a, rim1_b, r_scale, t_scale), zoom(rim2_a, rim2_b, r_scale, t_scale));
+        draw_line_xy(cr, zoom(hub_a, hub_b, r_scale), zoom(rim1_a, rim1_b, r_scale));
+        draw_line_xy(cr, zoom(rim1_a, rim1_b, r_scale), zoom(rim2_a, rim2_b, r_scale));
     }
 }
 
@@ -245,7 +244,7 @@ void plot_deform(wheel *a, wheel *b, const char *path) {
     cairo_set_source_rgb(cr, 0.5, 0.5, 0.5);
     draw_wheel(cr, a);
     cairo_set_source_rgb(cr, 0.0, 0.0, 0.0);
-    draw_deform(cr, a, b, ZOOM, ZOOM);
+    draw_deform(cr, a, b, ZOOM);
     close_plot(cr, surface, path);
 }
 
@@ -308,7 +307,7 @@ xy force(wheel *w, int i_rim, xy rim, load *load) {
     return f;
 }
 
-double f_descent(double x, void *params) {
+double f_abs_force(double x, void *params) {
 
     data *d = (data*)params;
     wheel *w = d->wheel;
@@ -317,17 +316,15 @@ double f_descent(double x, void *params) {
 //    ludebug(dbg, "Descent %g: (%g,%g)", x, rim.x, rim.y);
 
     xy fxy = force(w, d->i_rim, rim, d->load);
-    double f = dot(d->descent, fxy);
-//    double f = length(fxy);
+    double f = length(fxy);
 //    ludebug(dbg, "Force (%g,%g) at %g: %g", fxy.x, fxy.y, x, f);
     return f;
 }
 
-#define ITER_MAX 100
-#define EPSABS 1e-3
-#define EPSREL 1e-8
+#define EPSABS 1e-7
+#define EPSREL (EPSABS/100)
 
-int relax_hole(wheel *w, xy *rim, load *load, int i_rim, double delta, int verbose) {
+int relax_hole(wheel *w, xy *rim, load *load, int i_rim, double delta, int max_iter, int verbose) {
 
     LU_STATUS
 
@@ -344,8 +341,8 @@ int relax_hole(wheel *w, xy *rim, load *load, int i_rim, double delta, int verbo
                 i_rim, params.zero.x, params.zero.y, params.descent.x, params.descent.y);
     }
 
-    gsl_root_fsolver *s = NULL;
-    LU_ASSERT(s = gsl_root_fsolver_alloc(gsl_root_fsolver_brent), LU_ERR, dbg, "Cannot create solver")
+    gsl_min_fminimizer *s = NULL;
+    LU_ASSERT(s = gsl_min_fminimizer_alloc(gsl_min_fminimizer_quad_golden), LU_ERR, dbg, "Cannot create minimizer")
 
     // calculate limit for range
     int i_before = (i_rim - 1 + w->n_holes) % w->n_holes;
@@ -364,24 +361,23 @@ int relax_hole(wheel *w, xy *rim, load *load, int i_rim, double delta, int verbo
     if (verbose) ludebug(dbg, "Range: %g - %g along (%g,%g)", lo, hi, params.descent.x, params.descent.y);
 
     gsl_function f;
-    f.function = f_descent;
+    f.function = f_abs_force;
     f.params = &params;
-    LU_ASSERT(!gsl_root_fsolver_set(s, &f, lo, hi), LU_ERR, dbg, "Cannot set solver")
+    LU_ASSERT(!gsl_min_fminimizer_set(s, &f, 0, lo, hi), LU_ERR, dbg, "Cannot set minimizer")
 
-    for (int iter = 0; iter < ITER_MAX && !sig_exit; ++iter) {
-        LU_ASSERT(!gsl_root_fsolver_iterate(s), LU_ERR, dbg, "Solver failed");
-        double x_lo = gsl_root_fsolver_x_lower(s);
-        double x_hi = gsl_root_fsolver_x_upper(s);
-        double x = gsl_root_fsolver_root(s);
-        if (verbose) ludebug(dbg, "Descent: %d; %g (%g - %g)", iter, x, x_lo, x_hi);
-        double residual = f.function(x, f.params);
-        int gsl_status = gsl_root_test_residual(residual, EPSABS);
+    for (int iter = 0; iter < max_iter && !sig_exit; ++iter) {
+        LU_ASSERT(!gsl_min_fminimizer_iterate(s), LU_ERR, dbg, "Minimizer failed");
+        double x_lo = gsl_min_fminimizer_x_lower(s);
+        double x_hi = gsl_min_fminimizer_x_upper(s);
+        double x = gsl_min_fminimizer_minimum(s);
+        if (verbose) ludebug(dbg, "Minimize: %d; %g (%g - %g)", iter, x, x_lo, x_hi);
+        int gsl_status = gsl_min_test_interval(x_lo, x_hi, EPSABS, EPSREL);
         if (gsl_status == GSL_SUCCESS) break;
         LU_ASSERT(gsl_status == GSL_CONTINUE, LU_ERR, dbg, "Test failed");
     }
 
-    double root = gsl_root_fsolver_root(s);
-    xy end = add(params.zero, scalar_mult(root, params.descent));
+    double min = gsl_min_fminimizer_minimum(s);
+    xy end = add(params.zero, scalar_mult(min, params.descent));
     xy f_end = force(w, i_rim, end, load);
     if (verbose) ludebug(dbg, "End point: (%g,%g); Force: (%g,%g)", end.x, end.y, f_end.x, f_end.y);
 
@@ -391,8 +387,7 @@ int relax_hole(wheel *w, xy *rim, load *load, int i_rim, double delta, int verbo
     xy f_mid = force(w, i_rim, mid, load);
     if (length(f_mid) < length(f_start)) {
         if (verbose) {
-            luinfo(dbg, "Shift: (%g,%g) (Delta: %g) to (%g,%g)",
-                    frac.x, frac.y, delta, rim[params.i_rim].x, rim[params.i_rim].y);
+            luinfo(dbg, "Shift: (%g,%g) (Delta: %g) to (%g,%g)", frac.x, frac.y, delta, mid.x, mid.y);
         }
         rim[params.i_rim] = mid;
     } else {
@@ -401,7 +396,7 @@ int relax_hole(wheel *w, xy *rim, load *load, int i_rim, double delta, int verbo
     }
 
 LU_CLEANUP
-    if (s) gsl_root_fsolver_free(s);
+    if (s) gsl_min_fminimizer_free(s);
     LU_RETURN
 }
 
@@ -416,8 +411,10 @@ float residual(wheel *wheel, load *load) {
     return residual;
 }
 
+#define MAXFORCE 100
+
 // damp should be 0.9 for an initial step of 0.1, 0.99 for 0.01, etc
-int relax(wheel *wheel, load *load, double step, double damp, int verbose) {
+int relax(wheel *wheel, load *load, double step, double damp, int max_iter, int verbose) {
 
     LU_STATUS
     double force = 0;
@@ -431,12 +428,12 @@ int relax(wheel *wheel, load *load, double step, double damp, int verbose) {
         int sign = (2 * gsl_rng_uniform_int(rng, 2)) - 1;
         for (int i_rim = 0; i_rim < wheel->n_holes; ++i_rim) {
 //            ludebug(dbg, "Relaxing hole %d at (%g,%g)", i_rim, wheel->rim[i_rim].x, wheel->rim[i_rim].y);
-            LU_CHECK(relax_hole(wheel, new_rim, load, i_rim, step * (1 - pow(damp, iter)), verbose))
+            LU_CHECK(relax_hole(wheel, new_rim, load, i_rim, step * (1 - pow(damp, iter)), 1e6, verbose))
         }
         for (int i = 0; i < wheel->n_holes; ++i) wheel->rim[i] = new_rim[i];
         force = residual(wheel, load);
-        if (sig_exit || force <= 10 || !(iter & (iter - 1))) luinfo(dbg, "Iteration: %d; Residual: %g", iter, force);
-    } while (!sig_exit && force > 10);
+        if (sig_exit || force <= MAXFORCE || iter == max_iter || !(iter & (iter - 1))) luinfo(dbg, "Iteration: %d; Residual: %g", iter, force);
+    } while (!sig_exit && force > MAXFORCE && iter < max_iter);
     if (sig_exit) luwarn(dbg, "SIGINT aborted relax");
 
 LU_CLEANUP
@@ -444,7 +441,7 @@ LU_CLEANUP
     LU_RETURN
 }
 
-#define TARGET_WOBBLE 1e-5
+#define TARGET_WOBBLE 1e-3
 #define DAMP_TRUE 0.5
 #define DAMP_TENSION 0.5
 
@@ -452,7 +449,7 @@ int true(wheel *w) {
 
     LU_STATUS
 
-    LU_CHECK(relax(w, NULL, 0.5, 0.9, 0))
+    LU_CHECK(relax(w, NULL, 0.5, 0.9, 1e6, 0))
 
     while(!sig_exit) {
 
@@ -473,7 +470,7 @@ int true(wheel *w) {
             }
         }
         luinfo(dbg, "Total correction %gmm", shift);
-        LU_CHECK(relax(w, NULL, 0.5, 0, 0));
+        LU_CHECK(relax(w, NULL, 0.5, 0, 1e6, 0));
 
         double tension = 0;
         for (int i = 0; i < w->n_holes; ++i) {
@@ -490,7 +487,7 @@ int true(wheel *w) {
             // if tension is too large, correction is positive and spoke is extended
             w->l_spoke[i] += DAMP_TENSION * w->l_spoke[i] * error / w->e_spoke;
         }
-        LU_CHECK(relax(w, NULL, 0.5, 0, 0));
+        LU_CHECK(relax(w, NULL, 0.5, 0, 1e6, 0));
     }
 
     luinfo(dbg, "True!");
@@ -544,15 +541,13 @@ int deform(wheel *wheel) {
     load *l = NULL;
 
     LU_ALLOC(dbg, l, 1)
-    l->g_norm.x = 0;
-    l->g_norm.y = -1;
+    l->g_norm.x = 1/sqrt(2);
+    l->g_norm.y = -1/sqrt(2);
     l->i_rim = 0;
+    l->mass = 100;
 
-    for (int i = 0; i < 100; ++i) {
-        l->mass = i + 1;
-        luinfo(dbg,"Mass %gkg", l->mass);
-        LU_CHECK(relax(wheel, l, 0.5, 0.99, 0))
-    }
+    luinfo(dbg,"Mass %gkg", l->mass);
+    LU_CHECK(relax(wheel, l, 0.1, 0.99, 1000000, 0))
 
 LU_CLEANUP
     free(l);
