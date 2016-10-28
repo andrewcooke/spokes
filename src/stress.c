@@ -3,6 +3,8 @@
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
+#include <signal.h>
+#include <unistd.h>
 
 #include "cairo/cairo.h"
 #include "gsl/gsl_multimin.h"
@@ -18,10 +20,13 @@
 
 lulog *dbg = NULL;
 gsl_rng *rng = NULL;
+volatile int sig_exit = 0;
 
 #define X 0
 #define Y 1
 #define G 9.8
+
+#define ZOOM 200
 
 
 typedef struct {
@@ -160,7 +165,7 @@ void open_plot(wheel * wheel, int nx, int ny, double line_width, cairo_t **cr, c
     cairo_paint(*cr);
 
     cairo_translate(*cr, nx/2, ny/2);
-    cairo_scale(*cr, nx/(2.2 * wheel->r_rim), ny/(2.2 * wheel->r_rim));
+    cairo_scale(*cr, nx/(2.2 * wheel->r_rim), -ny/(2.2 * wheel->r_rim));
 
     cairo_set_line_width(*cr, line_width);
     cairo_set_source_rgb(*cr, 0, 0, 0);
@@ -189,23 +194,23 @@ void plot_wheel(wheel *wheel, const char *path) {
     close_plot(cr, surface, path);
 }
 
-xy zoom(xy a, xy b, double r_scale, double t_scale) {
+xy zoom(xy a, xy b, double r_scale) {
     xy d = sub(b, a);
     double r = sqrt(d.x * d.x + d.y * d.y), theta = atan2(d.y, d.x);
-    r *= r_scale; theta *= t_scale;
+    r *= r_scale;
     d.x = r * cos(theta); d.y = r * sin(theta);
     return add(a, d);
 }
 
-void draw_deform(cairo_t *cr, wheel *a, wheel *b, double r_scale, double t_scale) {
+void draw_deform(cairo_t *cr, wheel *a, wheel *b, double r_scale) {
     for (int i = 0; i < a->n_holes; ++i) {
         int j = a->hub_to_rim[i];
         xy hub_a = a->hub[i], hub_b = b->hub[i];
         xy rim1_a = a->rim[j], rim1_b = b->rim[j];
         int k = (j + 1) % a->n_holes;
         xy rim2_a = a->rim[k], rim2_b = b->rim[k];
-        draw_line_xy(cr, zoom(hub_a, hub_b, r_scale, t_scale), zoom(rim1_a, rim1_b, r_scale, t_scale));
-        draw_line_xy(cr, zoom(rim1_a, rim1_b, r_scale, t_scale), zoom(rim2_a, rim2_b, r_scale, t_scale));
+        draw_line_xy(cr, zoom(hub_a, hub_b, r_scale), zoom(rim1_a, rim1_b, r_scale));
+        draw_line_xy(cr, zoom(rim1_a, rim1_b, r_scale), zoom(rim2_a, rim2_b, r_scale));
     }
 }
 
@@ -216,7 +221,7 @@ void plot_deform(wheel *a, wheel *b, const char *path) {
     cairo_set_source_rgb(cr, 0.5, 0.5, 0.5);
     draw_wheel(cr, a);
     cairo_set_source_rgb(cr, 0.0, 0.0, 0.0);
-    draw_deform(cr, a, b, 1e2, 1e2);
+    draw_deform(cr, a, b, ZOOM);
     close_plot(cr, surface, path);
 }
 
@@ -241,14 +246,6 @@ typedef struct {
     xy *chord;
     load *load;
 } data;
-
-void add_noise(wheel *w, double delta) {
-    for (int i = 0; i < w->n_holes; ++i) {
-        w->rim[i].x += delta * 2 * (gsl_rng_uniform(rng) - 0.5);
-        w->rim[i].y += delta * 2 * (gsl_rng_uniform(rng) - 0.5);
-    }
-    luinfo(dbg, "Added noise of %gmm", delta);
-}
 
 void calculate_data(const gsl_vector *rim, data *d) {
 
@@ -375,109 +372,19 @@ void energy_and_neg_force(const gsl_vector *rim, void *params, double *energy, g
 
 #define FDF
 
-int relax(wheel *wheel, load *load) {
-
+int alloc_data(data **d, wheel *w, load *l) {
     LU_STATUS
-    gsl_vector *rim = NULL, *step = NULL;
-#ifdef FDF
-    const gsl_multimin_fdfminimizer_type *T;
-    gsl_multimin_fdfminimizer *s = NULL;
-    gsl_multimin_function_fdf callbacks;
-#else
-    const gsl_multimin_fminimizer_type *T;
-    gsl_multimin_fminimizer *s = NULL;
-    gsl_multimin_function callbacks;
-#endif
-    data *d = NULL;
-    int gsl_status = GSL_CONTINUE;
+    LU_ALLOC(dbg, *d, 1);
+    (*d)->wheel = w;
+    (*d)->load = l;
+    LU_ALLOC(dbg, (*d)->spoke, w->n_holes);
+    LU_ALLOC(dbg, (*d)->spoke_extn, w->n_holes);
+    LU_ALLOC(dbg, (*d)->chord, w->n_holes);
+    LU_ALLOC(dbg, (*d)->chord_extn, w->n_holes);
+    LU_NO_CLEANUP
+}
 
-    LU_ALLOC(dbg, d, 1);
-    d->wheel = wheel;
-    d->load = load;
-    LU_ALLOC(dbg, d->spoke, wheel->n_holes);
-    LU_ALLOC(dbg, d->spoke_extn, wheel->n_holes);
-    LU_ALLOC(dbg, d->chord, wheel->n_holes);
-    LU_ALLOC(dbg, d->chord_extn, wheel->n_holes);
-
-    callbacks.n = 2 * wheel->n_holes;
-    callbacks.params = d;
-    callbacks.f = energy;
-#ifdef FDF
-    callbacks.df = neg_force;
-    callbacks.fdf = energy_and_neg_force;
-#endif
-
-    rim = gsl_vector_alloc(2 * wheel->n_holes);
-    for (int i = 0; i < wheel->n_holes; ++i) {
-        gsl_vector_set(rim, 2*i+X, wheel->rim[i].x);
-        gsl_vector_set(rim, 2*i+Y, wheel->rim[i].y);
-    }
-
-    double e = energy(rim, d);
-    luinfo(dbg, "Initial energy: %g", e);
-
-#ifdef FDF
-    T = gsl_multimin_fdfminimizer_steepest_descent;
-//    T = gsl_multimin_fdfminimizer_conjugate_fr;
-//    T = gsl_multimin_fdfminimizer_vector_bfgs2;
-    s = gsl_multimin_fdfminimizer_alloc(T, 2 * wheel->n_holes);
-    luinfo(dbg, "Method %s", gsl_multimin_fdfminimizer_name(s));
-    gsl_multimin_fdfminimizer_set(s, &callbacks, rim, 1e-4, 1e-3);
-#else
-    T = gsl_multimin_fminimizer_nmsimplex;
-    s = gsl_multimin_fminimizer_alloc(T, 2 * wheel->n_holes);
-    luinfo(dbg, "Method %s", gsl_multimin_fminimizer_name(s));
-    step = gsl_vector_alloc(2 * wheel->n_holes);
-    gsl_vector_set_all(step, 1e-4);
-    gsl_multimin_fminimizer_set(s, &callbacks, rim, step);
-#endif
-
-    for (int iter = 0; iter < 1000 && gsl_status == GSL_CONTINUE; ++iter) {
-        ludebug(dbg, "Iteration %d", iter);
-#ifdef FDF
-        gsl_status = gsl_multimin_fdfminimizer_iterate(s);
-#else
-        gsl_status = gsl_multimin_fminimizer_iterate(s);
-#endif
-        if (gsl_status == GSL_ENOPROG) {
-            luwarn(dbg, "Cannot progress");
-        // below not necessary - could consider restart
-//        } else if (!gsl_status && iter < 1) {
-//            ludebug(dbg, "Forcing new iteration");
-//            gsl_status = GSL_CONTINUE;
-        } else if (!gsl_status) {
-#ifdef FDF
-            gsl_status = gsl_multimin_test_gradient(s->gradient, 1e-4);
-            if (gsl_status == GSL_SUCCESS) luinfo(dbg, "Minimum energy: %g", s->f);
-#else
-            double size = gsl_multimin_fminimizer_size(s);
-            ludebug(dbg, "Size %g", size);
-            gsl_status = gsl_multimin_test_size(size, 1e-6);
-            if (gsl_status == GSL_SUCCESS) luinfo(dbg, "Minimum energy: %g", s->fval);
-#endif
-        }
-    }
-//    LU_ASSERT(gsl_status == GSL_SUCCESS, LU_ERR, dbg, "Equilibrium not found")
-
-    double shift = 0.0;
-    for (int i = 0; i < wheel->n_holes; ++i) {
-        double x = gsl_vector_get(s->x, 2*i+X), y = gsl_vector_get(s->x, 2*i+Y);
-        double dx = wheel->rim[i].x - x, dy = wheel->rim[i].y - y;
-        shift += sqrt(dx * dx + dy * dy);
-        wheel->rim[i].x = x;
-        wheel->rim[i].y = y;
-    }
-    shift = shift / wheel->n_holes;
-    ludebug(dbg, "Average shift %gmm", shift);
-
-LU_CLEANUP
-#ifdef FDF
-    gsl_multimin_fdfminimizer_free(s);
-#else
-    gsl_multimin_fminimizer_free(s);
-    gsl_vector_free(step);
-#endif
-    gsl_vector_free(rim);
+void free_data(data *d) {
     if (d) {
         free(d->spoke);
         free(d->spoke_extn);
@@ -485,10 +392,144 @@ LU_CLEANUP
         free(d->chord_extn);
         free(d);
     }
+}
+
+void alloc_rim(gsl_vector **rim, wheel *w) {
+    *rim = gsl_vector_alloc(2 * w->n_holes);
+    for (int i = 0; i < w->n_holes; ++i) {
+        gsl_vector_set(*rim, 2*i+X, w->rim[i].x);
+        gsl_vector_set(*rim, 2*i+Y, w->rim[i].y);
+    }
+}
+
+void log_energy(wheel *w, load *l, const char *msg) {
+    gsl_vector *rim = NULL;
+    data *d = NULL;
+    alloc_rim(&rim, w);
+    alloc_data(&d, w, l);
+    double e = energy(rim, d);
+    luinfo(dbg, "%s: %g", msg, e);
+    free_data(d);
+    gsl_vector_free(rim);
+}
+
+void update_rim(gsl_vector *rim, wheel *w) {
+    double shift = 0.0;
+    for (int i = 0; i < w->n_holes; ++i) {
+        double x = gsl_vector_get(rim, 2*i+X), y = gsl_vector_get(rim, 2*i+Y);
+        double dx = w->rim[i].x - x, dy = w->rim[i].y - y;
+        shift += sqrt(dx * dx + dy * dy);
+        w->rim[i].x = x;
+        w->rim[i].y = y;
+    }
+    shift = shift / w->n_holes;
+    ludebug(dbg, "Average shift %gmm", shift);
+}
+
+int relax_f(wheel *wheel, load *load) {
+
+    LU_STATUS
+    gsl_vector *rim = NULL, *step = NULL;
+    const gsl_multimin_fminimizer_type *T;
+    gsl_multimin_fminimizer *s = NULL;
+    gsl_multimin_function callbacks;
+    data *d = NULL;
+    int gsl_status = GSL_CONTINUE;
+
+    LU_CHECK(alloc_data(&d, wheel, load))
+    alloc_rim(&rim, wheel);
+
+    callbacks.n = 2 * wheel->n_holes;
+    callbacks.params = d;
+    callbacks.f = energy;
+
+    T = gsl_multimin_fminimizer_nmsimplex;
+    s = gsl_multimin_fminimizer_alloc(T, 2 * wheel->n_holes);
+//    luinfo(dbg, "Method %s", gsl_multimin_fminimizer_name(s));
+    step = gsl_vector_alloc(2 * wheel->n_holes);
+    gsl_vector_set_all(step, 1e-4);
+    gsl_multimin_fminimizer_set(s, &callbacks, rim, step);
+
+    for (int iter = 0; iter < 1000 && gsl_status == GSL_CONTINUE && !sig_exit; ++iter) {
+        ludebug(dbg, "Iteration %d", iter);
+        gsl_status = gsl_multimin_fminimizer_iterate(s);
+        if (gsl_status == GSL_ENOPROG) {
+            luwarn(dbg, "Cannot progress");
+        } else if (!gsl_status) {
+            double size = gsl_multimin_fminimizer_size(s);
+            ludebug(dbg, "Size %g", size);
+            gsl_status = gsl_multimin_test_size(size, 1e-6);
+            if (gsl_status == GSL_SUCCESS) luinfo(dbg, "Minimum energy: %g", s->fval);
+        }
+    }
+
+    update_rim(s->x, wheel);
+
+LU_CLEANUP
+    gsl_multimin_fminimizer_free(s);
+    gsl_vector_free(step);
+    gsl_vector_free(rim);
+    free_data(d);
     LU_RETURN
 }
 
-#define TARGET_WOBBLE 1e-6
+int relax_fdf(wheel *wheel, load *load) {
+
+    LU_STATUS
+    gsl_vector *rim = NULL, *step = NULL;
+    const gsl_multimin_fdfminimizer_type *T;
+    gsl_multimin_fdfminimizer *s = NULL;
+    gsl_multimin_function_fdf callbacks;
+    data *d = NULL;
+    int gsl_status = GSL_CONTINUE;
+
+    LU_CHECK(alloc_data(&d, wheel, load))
+    alloc_rim(&rim, wheel);
+
+    callbacks.n = 2 * wheel->n_holes;
+    callbacks.params = d;
+    callbacks.f = energy;
+    callbacks.df = neg_force;
+    callbacks.fdf = energy_and_neg_force;
+
+    T = gsl_multimin_fdfminimizer_steepest_descent;
+//    T = gsl_multimin_fdfminimizer_conjugate_fr;
+//    T = gsl_multimin_fdfminimizer_vector_bfgs2;
+    s = gsl_multimin_fdfminimizer_alloc(T, 2 * wheel->n_holes);
+//    luinfo(dbg, "Method %s", gsl_multimin_fdfminimizer_name(s));
+    gsl_multimin_fdfminimizer_set(s, &callbacks, rim, 1e-4, 1e-3);
+
+    for (int iter = 0; iter < 1000 && gsl_status == GSL_CONTINUE && !sig_exit; ++iter) {
+        ludebug(dbg, "Iteration %d", iter);
+        gsl_status = gsl_multimin_fdfminimizer_iterate(s);
+        if (gsl_status == GSL_ENOPROG) {
+            luwarn(dbg, "Cannot progress");
+        } else if (!gsl_status) {
+            gsl_status = gsl_multimin_test_gradient(s->gradient, 1e-4);
+            if (gsl_status == GSL_SUCCESS) luinfo(dbg, "Minimum energy: %g", s->f);
+        }
+    }
+
+    update_rim(s->x, wheel);
+
+LU_CLEANUP
+    gsl_multimin_fdfminimizer_free(s);
+    gsl_vector_free(rim);
+    free_data(d);
+    LU_RETURN
+}
+
+int relax(wheel *w, load *l, int n) {
+    LU_STATUS
+    for (int i = 0; i < n; ++i) {
+        if (i) log_energy(w, l, "Intermediate energy");
+        LU_CHECK(relax_fdf(w, l))
+        LU_CHECK(relax_f(w, l))
+    }
+    LU_NO_CLEANUP
+}
+
+#define TARGET_WOBBLE 1e-3
 #define DAMP_TRUE 0.5
 #define DAMP_TENSION 0.5
 
@@ -496,8 +537,8 @@ int true(wheel *w) {
 
     LU_STATUS
 
-    add_noise(w, 1e-4);
-    LU_CHECK(relax(w, NULL))
+    log_energy(w, NULL, "Energy before truing");
+    LU_CHECK(relax(w, NULL, 1))
 
     while(1) {
 
@@ -518,7 +559,7 @@ int true(wheel *w) {
             }
         }
         luinfo(dbg, "Total correction %gmm", shift);
-        LU_CHECK(relax(w, NULL));
+        LU_CHECK(relax(w, NULL, 1));
 
         double tension = 0;
         for (int i = 0; i < w->n_holes; ++i) {
@@ -535,10 +576,11 @@ int true(wheel *w) {
             // if tension is too large, correction is positive and spoke is extended
             w->l_spoke[i] += DAMP_TENSION * w->l_spoke[i] * error / w->e_spoke;
         }
-        LU_CHECK(relax(w, NULL));
+        LU_CHECK(relax(w, NULL, 1));
     }
 
     luinfo(dbg, "True!");
+    log_energy(w, NULL, "Energy after truing");
 
 LU_CLEANUP
     LU_RETURN
@@ -589,18 +631,15 @@ int deform(wheel *wheel) {
     load *l = NULL;
 
     LU_ALLOC(dbg, l, 1)
-    l->g_norm.x = -1;
-    l->g_norm.y = 0;
-    l->i_rim = 4;
+    l->g_norm.x = 1/sqrt(2);
+    l->g_norm.y = -1/sqrt(2);
+    l->i_rim = 0;
     l->start = wheel->rim[l->i_rim];
-
-    add_noise(wheel, 1e-5);
-
-    for (int i = -3; i < 2; ++i) {
-        l->mass = pow(10, i+1);
-        ludebug(dbg,"Mass %gkg", l->mass);
-        LU_CHECK(relax(wheel, l))
-    }
+    l->mass = 100;
+    ludebug(dbg,"Mass %gkg", l->mass);
+    log_energy(wheel, l, "Energy before deforming");
+    LU_CHECK(relax(wheel, l, 200))
+    log_energy(wheel, l, "Energy after deforming");
 
 LU_CLEANUP
     free(l);
@@ -623,10 +662,10 @@ int stress(const char *pattern) {
     LU_CHECK(lace(wheel))
     LU_CHECK(true(wheel))
     LU_CHECK(copy_wheel(wheel, &original))
-//    LU_CHECK(deform(wheel))
+    LU_CHECK(deform(wheel))
     LU_CHECK(make_path(dbg, pattern, &path))
-//    plot_deform(original, wheel, path);
-    plot_wheel(original, path);
+    plot_deform(original, wheel, path);
+//    plot_wheel(original, path);
 
 LU_CLEANUP
     free_wheel(original);
@@ -634,6 +673,18 @@ LU_CLEANUP
     free(path);
     free(offsets);
     LU_RETURN
+}
+
+void new_handler(int sig) {
+    luwarn(dbg, "Handler called with %d", sig);
+    sig_exit = 1;
+}
+
+int set_handler() {
+    LU_STATUS
+    LU_ASSERT(!signal(SIGINT, &new_handler), LU_ERR, dbg, "Could not set handler")
+    luinfo(dbg, "Handler set");
+    LU_NO_CLEANUP
 }
 
 void usage(const char *progname) {
@@ -651,8 +702,9 @@ int main(int argc, char** argv) {
     if (argc != 2 || !strcmp("-h", argv[1])) {
         usage(argv[0]);
     } else {
+        LU_CHECK(set_handler())
         LU_ASSERT(rng = gsl_rng_alloc(gsl_rng_mt19937), LU_ERR, dbg, "Could not create PRNG")
-        LU_CHECK(stress(argv[1]));
+        LU_CHECK(stress(argv[1]))
     }
 
 LU_CLEANUP
