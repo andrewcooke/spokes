@@ -27,9 +27,11 @@ volatile int sig_exit = 0;
 #define Y 1
 #define G 9.8
 
-#define MAX_ITER 1000000
+#define MAX_ITER_OUTER 10000
+#define MAX_ITER_INNER 10000
 #define N_DEFORM 1
 #define MAX_SIZE 1e-8
+#define MAX_FORCE 1
 
 
 typedef struct {
@@ -314,6 +316,22 @@ void fourier_coeff_to_rim(const gsl_vector *coeff, data *d) {
 
 }
 
+void xy_coeff_to_rim(const gsl_vector *coeff, data *d) {
+
+    wheel *w = d->wheel;
+
+    for (int i = 0; i < w->n_holes; ++i) {
+        d->offset[i].x = gsl_vector_get(coeff, 2*i+X);
+        d->offset[i].y = gsl_vector_get(coeff, 2*i+Y);
+    }
+
+    for (int i = 0; i < w->n_holes; ++i) {
+        d->rim[i] = add(w->rim[i], d->offset[i]);
+    }
+
+}
+
+
 void calculate_data(const gsl_vector *coeff, data *d) {
 
     wheel *w = d->wheel;
@@ -467,13 +485,15 @@ void alloc_coeff(gsl_vector **coeff, wheel *w) {
     *coeff = gsl_vector_calloc(2 * w->n_holes);
 }
 
-void log_energy(data *d, const char *msg) {
+void log_energy(data *d, const char *msg, double *final_energy, double *final_force) {
     double energy, total;
     gsl_vector *neg_force = gsl_vector_alloc(d->wheel->n_holes * 2);
     calculate_energy(d, &energy);
     calculate_neg_force(d, neg_force);
     total = sum_force(d->wheel, neg_force);
     luinfo(dbg, "%s: Energy %g, Force %g", msg, energy, total);
+    if (final_energy) *final_energy = energy;
+    if (final_force) *final_force = total;
     free(neg_force);
 }
 
@@ -489,7 +509,7 @@ void update_rim(gsl_vector *coeff, data *d, wheel *w) {
     ludebug(dbg, "Average shift %gmm", shift);
 }
 
-int relax_f_fourier(wheel *wheel, load *load) {
+int relax_f_fourier(wheel *wheel, load *load, double *final_energy, double *final_force) {
 
     LU_STATUS
     gsl_vector *coeff = NULL, *step = NULL;
@@ -504,7 +524,7 @@ int relax_f_fourier(wheel *wheel, load *load) {
     alloc_coeff(&coeff, wheel);
 
     calculate_data(coeff, d);
-    log_energy(d, "Before relax");
+    log_energy(d, "Before relax f Fourier", NULL, NULL);
 
     callbacks.n = 2 * wheel->n_holes;
     callbacks.params = d;
@@ -517,7 +537,7 @@ int relax_f_fourier(wheel *wheel, load *load) {
     gsl_vector_set_all(step, 1e-4);
     gsl_multimin_fminimizer_set(s, &callbacks, coeff, step);
 
-    for (int iter = 0; iter < MAX_ITER && gsl_status == GSL_CONTINUE && !sig_exit; ++iter) {
+    for (int iter = 0; iter < MAX_ITER_OUTER && gsl_status == GSL_CONTINUE && !sig_exit; ++iter) {
 //        ludebug(dbg, "Iteration %d", iter);
         gsl_status = gsl_multimin_fminimizer_iterate(s);
         if (gsl_status == GSL_ENOPROG) {
@@ -530,7 +550,7 @@ int relax_f_fourier(wheel *wheel, load *load) {
         }
     }
 
-    log_energy(d, "After relax");
+    log_energy(d, "After relax f Fourier", final_energy, final_force);
     update_rim(s->x, d, wheel);
 
 LU_CLEANUP
@@ -541,7 +561,13 @@ LU_CLEANUP
     LU_RETURN
 }
 
-int relax_fdf(wheel *wheel, load *load) {
+double vec_len(gsl_vector *v) {
+    double l = 0;
+    for (int i = 0; i < v->size; ++i) l = l + gsl_vector_get(v, i) * gsl_vector_get(v, i);
+    return sqrt(l);
+}
+
+int relax_fdf_xy(wheel *wheel, load *load, double *final_energy, double *final_force) {
 
     LU_STATUS
     gsl_vector *coeff = NULL, *step = NULL;
@@ -552,10 +578,11 @@ int relax_fdf(wheel *wheel, load *load) {
     int gsl_status = GSL_CONTINUE;
 
     LU_CHECK(alloc_data(&d, wheel, load))
+    d->to_rim = &xy_coeff_to_rim;
     alloc_coeff(&coeff, wheel);
 
     calculate_data(coeff, d);
-    log_energy(d, "Before relax");
+    log_energy(d, "Before relax fdf xy", NULL, NULL);
 
     callbacks.n = 2 * wheel->n_holes;
     callbacks.params = d;
@@ -570,18 +597,19 @@ int relax_fdf(wheel *wheel, load *load) {
 //    luinfo(dbg, "Method %s", gsl_multimin_fdfminimizer_name(s));
     gsl_multimin_fdfminimizer_set(s, &callbacks, coeff, 1e-4, 1e-3);
 
-    for (int iter = 0; iter < MAX_ITER && gsl_status == GSL_CONTINUE && !sig_exit; ++iter) {
-        ludebug(dbg, "Iteration %d", iter);
+    for (int iter = 0; iter < MAX_ITER_OUTER && gsl_status == GSL_CONTINUE && !sig_exit; ++iter) {
+//        ludebug(dbg, "Iteration %d", iter);
         gsl_status = gsl_multimin_fdfminimizer_iterate(s);
         if (gsl_status == GSL_ENOPROG) {
             luwarn(dbg, "Cannot progress");
         } else if (!gsl_status) {
             gsl_status = gsl_multimin_test_gradient(s->gradient, 1e-4);
+            if (!iter || !(iter & (iter - 1))) ludebug(dbg, "Gradient %g (%d)", vec_len(s->gradient), iter);
             if (gsl_status == GSL_SUCCESS) luinfo(dbg, "Minimum energy: %g", s->f);
         }
     }
 
-    log_energy(d, "After relax");
+    log_energy(d, "After relax fdf xy", final_energy, final_force);
     update_rim(s->x, d, wheel);
 
 LU_CLEANUP
@@ -593,9 +621,12 @@ LU_CLEANUP
 
 int relax(wheel *w, load *l, int n) {
     LU_STATUS
+    double final_energy, final_force;
     for (int i = 0; i < n; ++i) {
-//        LU_CHECK(relax_fdf(w, l))
-        LU_CHECK(relax_f_fourier(w, l))
+        ludebug(dbg, "Relax %d/%d", i , n);
+        LU_CHECK(relax_fdf_xy(w, l, NULL, NULL))
+        LU_CHECK(relax_f_fourier(w, l, &final_energy, &final_force))
+        if (final_force <= MAX_FORCE) break;
     }
     LU_NO_CLEANUP
 }
@@ -608,7 +639,7 @@ int true(wheel *w) {
 
     LU_STATUS
 
-    LU_CHECK(relax(w, NULL, 1))
+    LU_CHECK(relax(w, NULL, MAX_ITER_INNER))
 
     while(1) {
 
@@ -629,7 +660,7 @@ int true(wheel *w) {
             }
         }
         luinfo(dbg, "Total correction %gmm", shift);
-        LU_CHECK(relax(w, NULL, 1));
+        LU_CHECK(relax(w, NULL, MAX_ITER_INNER));
 
         double tension = 0;
         for (int i = 0; i < w->n_holes; ++i) {
@@ -646,7 +677,7 @@ int true(wheel *w) {
             // if tension is too large, correction is positive and spoke is extended
             w->l_spoke[i] += DAMP_TENSION * w->l_spoke[i] * error / w->e_spoke;
         }
-        LU_CHECK(relax(w, NULL, 1));
+        LU_CHECK(relax(w, NULL, MAX_ITER_INNER));
     }
 
     luinfo(dbg, "True!");
@@ -702,7 +733,7 @@ int deform(wheel *wheel, load *l) {
         l->mass = 10 * (float)(i + 1) / N_DEFORM;
         ludebug(dbg,"Mass %gkg", l->mass);
         l->start = wheel->rim[l->i_rim];
-        LU_CHECK(relax(wheel, l, 1000))
+        LU_CHECK(relax(wheel, l, MAX_ITER_INNER))
     }
 
     LU_NO_CLEANUP
