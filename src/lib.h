@@ -2,6 +2,8 @@
 #ifndef SPOKES_LIB_H
 #define SPOKES_LIB_H
 
+#include "cairo/cairo.h"
+
 #include "lu/log.h"
 
 void draw_circle(cairo_t *cr, float r);
