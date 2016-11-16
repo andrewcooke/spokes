@@ -9,6 +9,7 @@ typedef struct {
 
 typedef struct {
     char type;
+    char *pattern;
     int n_offsets;
     int *offset;
     int align;        // extra offset of "other side"
@@ -34,7 +35,7 @@ typedef struct {
     xy end;       // final location of load (rim)
 } load;
 
-int make_wheel(lulog *dbg, int *offsets, int length, int holes, int padding, char type, wheel **wheel);
+int make_wheel(lulog *dbg, int *offsets, int length, int holes, int padding, char type, const char *pattern, wheel **wheel);
 void free_wheel(wheel *wheel);
 int copy_wheel(lulog *dbg, wheel *w, wheel **c);
 
@@ -52,5 +53,7 @@ void close_plot(cairo_t *cr, cairo_surface_t *surface, const char *path);
 void plot_wheel(wheel *wheel, const char *path);
 void plot_deform(wheel *original, wheel *deformed, load *l, const char *path, double scale);
 int plot_multi_deform(lulog *dbg, wheel *original, wheel *deformed, load *l, const char *pattern);
+
+int dump_wheel(lulog *dbg, wheel *w, const char *desc);
 
 #endif

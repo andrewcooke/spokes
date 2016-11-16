@@ -1,5 +1,6 @@
 
 #include <math.h>
+#include <string.h>
 
 #include "cairo/cairo.h"
 
@@ -13,10 +14,11 @@
 #include "lib.h"
 
 
-int make_wheel(lulog *dbg, int *offsets, int length, int holes, int padding, char type, wheel **wheel) {
+int make_wheel(lulog *dbg, int *offsets, int length, int holes, int padding, char type, const char *pattern, wheel **wheel) {
     LU_STATUS
     LU_ALLOC(dbg, *wheel, 1);
     (*wheel)->type = type;
+    (*wheel)->pattern = strdup(pattern);
     (*wheel)->n_offsets = length;
     LU_ALLOC(dbg, (*wheel)->offset, length);
     for (int i = 0; i < length; ++i) (*wheel)->offset[i] = offsets[i];
@@ -39,6 +41,7 @@ int make_wheel(lulog *dbg, int *offsets, int length, int holes, int padding, cha
 
 void free_wheel(wheel *wheel) {
     if (wheel) {
+        free(wheel->pattern);
         free(wheel->offset);
         free(wheel->rim);
         free(wheel->hub);
@@ -51,7 +54,7 @@ void free_wheel(wheel *wheel) {
 
 int copy_wheel(lulog *dbg, wheel *w, wheel **c) {
     LU_STATUS
-    LU_CHECK(make_wheel(dbg, w->offset, w->n_offsets, w->n_holes, w->align, w->type, c))
+    LU_CHECK(make_wheel(dbg, w->offset, w->n_offsets, w->n_holes, w->align, w->type, w->pattern, c))
     for (int i = 0; i < w->n_holes; ++i) {
         (*c)->hub[i] = w->hub[i];
         (*c)->rim[i] = w->rim[i];
@@ -184,7 +187,7 @@ int plot_multi_deform(lulog *dbg, wheel *original, wheel *deformed, load *l, con
     LU_STATUS
     lustr path = {0};
     for (int i = 0; i < 6; ++i) {
-        LU_CHECK(lustr_printf(dbg, &path, "%s-%d.png", pattern, i))
+        LU_CHECK(lustr_sprintf(dbg, &path, "%s-%d.png", pattern, i))
         double scale = pow(10, i);
         plot_deform(original, deformed, l, path.c, scale);
         luinfo(dbg, "Scale %g plot: %s", scale, path.c);
@@ -195,3 +198,45 @@ LU_CLEANUP
     LU_RETURN
 }
 
+void print_wheel(lulog *dbg, wheel *w, FILE *f) {
+    fprintf(f, "wheel\n");
+    fprintf(f, " %d offsets: ", w->n_offsets);
+    for (int i = 0; i < w->n_offsets; ++i) {
+        if (i) fprintf(f, ", ");
+        fprintf(f, "%d", w->offset[i]);
+    }
+    fprintf(f, "\n");
+    fprintf(f, " align: %d\n", w->align);
+    fprintf(f, " %d spokes:\n", w->n_holes);
+    for (int i = 0; i < w->n_holes; ++i) {
+        int j = w->hub_to_rim[i];
+        double l = length(sub(w->hub[i], w->rim[j]));
+        fprintf(f, "  %d %g,%g -> %g,%g %d  %g/%g = %g\n",
+                i, w->hub[i].x, w->hub[i].y, j, w->rim[j].x, w->rim[j].y,
+                l, w->l_spoke[i],
+                w->e_spoke * (l - w->l_spoke[i]) / w->l_spoke[i]);
+    }
+    fprintf(f, " %d chords:\n", w->n_holes);
+    for (int i = 0; i < w->n_holes; ++i) {
+        int j = (i + 1) % w->n_holes;
+        double l = length(sub(w->rim[i], w->rim[j]));
+        fprintf(f, "  %d %g,%g -> %g,%g %d  %g/%g = %g\n",
+                i, w->rim[i].x, w->rim[i].y, j, w->rim[j].x, w->rim[j].y,
+                l, w->l_chord,
+                w->e_rim * (l - w->l_chord) / w->l_chord);
+    }
+    fprintf(f, " e: %g spoke, %g rim; target %g\n", w->e_spoke, w->e_rim, w->tension);
+}
+
+int dump_wheel(lulog *dbg, wheel *w, const char *desc) {
+    LU_STATUS
+    FILE *file = NULL;
+    lustr path = {0};
+    LU_CHECK(lustr_sprintf(dbg, &path, "%s-%s.txt", w->pattern, desc))
+    LU_CHECK(lufle_open(dbg, path.c, "w", &file))
+    print_wheel(dbg, w, file);
+LU_CLEANUP
+    if (file) fclose(file);
+    status = lustr_free(&path, status);
+    LU_RETURN
+}

@@ -34,6 +34,21 @@ volatile int sig_exit = 0;
 #define MAX_FORCE 1
 
 
+/*
+ * this coded does finite element analysis of wheels using a very simple
+ * physical model (described somewhere in an email or online post by jobst)
+ * where the rim is "hinged" at each spoke hole.
+ *
+ * unfortunately, for two leading two following, that model leads to a
+ * non-physical solution, where the rim folds back on itself.  also, the
+ * code below is extremely slow to converge - perhaps because i don't
+ * know how best to propagate forces around the rim when not in
+ * equilibrium.
+ *
+ * so i am not developing this further.
+ */
+
+
 struct data;
 
 typedef void coeff_to_rim(const gsl_vector *coeff, struct data *d);
@@ -426,6 +441,7 @@ int true(wheel *w) {
     LU_STATUS
 
     LU_CHECK(relax(w, NULL, MAX_ITER_INNER))
+    LU_CHECK(dump_wheel(dbg, w, "untrue"))
 
     while(1) {
 
@@ -466,6 +482,7 @@ int true(wheel *w) {
         LU_CHECK(relax(w, NULL, MAX_ITER_INNER));
     }
 
+    LU_CHECK(dump_wheel(dbg, w, "true"))
     luinfo(dbg, "True!");
 
 LU_CLEANUP
@@ -505,6 +522,8 @@ int lace(wheel *wheel) {
         double strain = wheel->tension / (sin(theta) * wheel->e_spoke);
         wheel->l_spoke[i_hub] = l * (1 - strain);
     }
+
+    LU_CHECK(dump_wheel(dbg, wheel, "laced"))
 
 LU_CLEANUP
     free(tension);
@@ -552,7 +571,7 @@ int stress(const char *pattern) {
     LU_ASSERT(strchr("AB", type), LU_ERR, dbg, "Only symmetric types supported")
     LU_CHECK(dump_pattern(dbg, offsets, length))
     LU_CHECK(rim_size(dbg, length, &holes))
-    LU_CHECK(make_wheel(dbg, offsets, length, holes, padding, type, &wheel))
+    LU_CHECK(make_wheel(dbg, offsets, length, holes, padding, type, pattern, &wheel))
     LU_CHECK(lace(wheel))
     LU_CHECK(true(wheel))
     LU_CHECK(copy_wheel(dbg, wheel, &original))
