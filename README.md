@@ -297,6 +297,7 @@ a [separate page](group-c.md).
 | 0A           | Radial       |
 | 2,0A         | Crow's Foot  |
 | 2,0A1        | Extended Crow's Foot |
+| 1B           | 1 Cross      |
 | 2B           | 2 Cross      |
 | 3B           | 3 Cross      |
 | 2,2B         | 2 Leading 2 Trailing |
