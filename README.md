@@ -1,11 +1,11 @@
 
 # A Catalogue Of Spoke Patterns
 
-This is a [complete](#complete) catalogue of [valid](#validity) spoke
-patterns to [length](#pattern-length) 6 with [offsets](#spoke-offsets)
-of 3 or less.  There is no guarantee of [safety or
-practicality](#safety-and-practicality) - in fact, **some patterns are
-unsafe or impractical**.
+This is a [complete](#complete) catalogue of [valid](#validity) spoke patterns
+to [length](#pattern-length) 6 with [offsets](#spoke-offsets) of 3 or less,
+threaded from [alternate sides](#alternate-sides).  There is no guarantee of
+[safety or practicality](#safety-and-practicality) - in fact, **some patterns
+are unsafe or impractical**.
 
 ## Contents
 
@@ -19,8 +19,9 @@ unsafe or impractical**.
     * [Pattern Groups](#pattern-groups)
     * [Pattern Length](#pattern-length)
     * [Preferred Names](#preferred-names)
+  * [Alternate Sides](#alternate-sides)
   * [Validity](#validity)
-  * [Rim Compatability](#rim-compatability)
+  * [Rim Compatibility](#rim-compatibility)
   * [Safety And Practicality](#safety-and-practicality)
   * [Completeness](#completeness)
   * [Footnotes](#footnotes)
@@ -361,7 +362,7 @@ describing the whole wheel we can describe just a single occurrence of
 the pattern - a single "slice of the pie".
 
 The number of spokes in the slice is called the *length* of the
-pattern (see [rim compatability](#rim-compatability)).
+pattern (see [rim compatibility](#rim-compatibility)).
 
 Sometimes I use the word "pattern" to refer to an entire wheel, and
 sometimes to just the "pie slice".  Hopefully this will be clear from
@@ -452,6 +453,27 @@ To avoid duplication I use the following rules:
   for rotations and reflections of patterns and discard anything that
   can be expressed as an "earlier" name<sup>[1](#footnote-1)</sup>.
 
+### Alternate Sides
+
+All patterns assume that adjacent spokes at the hub are threaded from
+alternate sides (inside, outside, inside, etc).  Sometimes this is not
+necessary and two spokes can be swapped (to give inside, outside, outside,
+inside, for example).
+
+An example can be seen [here](img/crowsfootclose.jpg) (original source
+[here](http://www.rideyourbike.com/images/crowsfootclose.jpg)).
+
+This modifies the pattern slightly, since the number of "crosses" changes.
+Ideally these patterns would also be listed here, but I did not consider this
+possibility until many years after doing the work.
+
+If you want to describe such a pattern you could refer to the pattern (in this
+catalogue) that would be used if the spokes were adjusted to be alternate, and
+then add the swapping details.
+
+Thanks to [u/no-trouble](https://www.reddit.com/user/no-trouble) on Reddit for
+pointing this out.
+
 ### Validity
 
 Not every pattern described by a name can be built in practice.  When
@@ -473,7 +495,7 @@ generating the catalogue I discard:
   spokes (because these patterns are not symmetric they are all
   group C).
 
-### Rim Compatability
+### Rim Compatibility
 
 A pattern of length N can be used in any wheel with a
 multiple<sup>[2](#footnote-2)</sup> of 2N spoke holes, providing the
